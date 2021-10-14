@@ -36,6 +36,24 @@ abstract class ActionBox<TActionDirectory extends ActionDirectory> {
     _actionDirectory = actionDirectory;
   }
 
+  void call<TParam, TResult, TAction extends Action<TParam, TResult>> ({
+    required ActionDescriptor<TAction, TParam, TResult> Function(TActionDirectory set) actionChooser,
+    TParam? parameter,
+    Function? begin,
+    Function? end,
+    Channel Function(TAction)? channelChooser,
+    Duration timeout = const Duration(seconds: 10),
+    bool subscribeable = true
+  }) => dispatch(
+    actionChooser: actionChooser,
+    parameter: parameter,
+    begin: begin,
+    end: end,
+    channelChooser: channelChooser,
+    timeout: timeout,
+    subscribeable: subscribeable
+  );
+
   void dispatch<TParam, TResult, TAction extends Action<TParam, TResult>> ({
     required ActionDescriptor<TAction, TParam, TResult> Function(TActionDirectory set) actionChooser,
     TParam? parameter,
