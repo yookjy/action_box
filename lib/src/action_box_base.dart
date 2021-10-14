@@ -8,7 +8,7 @@ import 'package:action_box/src/channels/channel.dart';
 import 'package:action_box/src/utils/pair.dart';
 import 'package:rxdart/rxdart.dart';
 
-abstract class ActionCenter<TActionDirectory extends ActionDirectory> {
+abstract class ActionBox<TActionDirectory extends ActionDirectory> {
 
   static ActionDirectory? _actionDirectory;
   static late final Subject<Object> _exceptionSubject = PublishSubject<Object>()
