@@ -6,7 +6,7 @@ class ActionBoxConfig {
 
   const ActionBoxConfig({
     required this.actionBoxTypeName,
-    required this.actionRootTypeName,
+    this.actionRootTypeName = 'ActionRoot',
     this.generateForDir = const ['lib']});
 }
 
