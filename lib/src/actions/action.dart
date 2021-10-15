@@ -4,7 +4,7 @@ import 'package:action_box/src/channels/channel.dart';
 
 abstract class Action<TParam, TResult> {
 
-  TransformedResult<TResult?> transform(Object exception) {
+  TransformedResult<TResult?> transform(Object error) {
     return TransformedResult(false, null);
   }
 

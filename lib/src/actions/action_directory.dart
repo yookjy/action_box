@@ -6,7 +6,7 @@ import 'package:action_box/src/actions/action_descriptor.dart';
 
 abstract class ActionDirectory {
 
-  late HashMap<String, ActionDescriptor> _actionDescriptors;
+  late Map<String, ActionDescriptor> _actionDescriptors;
 
   late List<ActionDirectory> _actionDirectory;
 
@@ -15,7 +15,8 @@ abstract class ActionDirectory {
     _actionDirectory = List.empty(growable: true);
   }
 
-  TActionDirectory putIfAbsentDirectory<TActionDirectory extends ActionDirectory>(TActionDirectory factory()) {
+  TActionDirectory putIfAbsentDirectory<TActionDirectory
+    extends ActionDirectory>(TActionDirectory Function() factory) {
     TActionDirectory? set;
     _actionDirectory.forEach((x) {
       if (x is TActionDirectory) {
@@ -31,8 +32,9 @@ abstract class ActionDirectory {
     return set!;
   }
 
-  ActionDescriptor<TAction, TParam, TResult> putIfAbsentDescriptor<TAction extends
-  Action<TParam, TResult>, TParam, TResult>(String actionBinderKey, TAction factory()) {
+  ActionDescriptor<TAction, TParam, TResult> putIfAbsentDescriptor<TAction
+    extends Action<TParam, TResult>, TParam, TResult>(String actionBinderKey,
+    TAction Function() factory) {
     if (actionBinderKey.isEmpty) {
       throw ArgumentError.value(actionBinderKey);
     }

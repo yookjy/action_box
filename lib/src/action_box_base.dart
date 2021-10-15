@@ -37,29 +37,29 @@ abstract class ActionBox<TActionDirectory extends ActionDirectory> {
   }
 
   void call<TParam, TResult, TAction extends Action<TParam, TResult>> ({
-    required ActionDescriptor<TAction, TParam, TResult> Function(TActionDirectory set) actionChooser,
-    TParam? parameter,
+    required ActionDescriptor<TAction, TParam, TResult> Function(TActionDirectory set) action,
+    TParam? param,
     Function? begin,
     Function? end,
-    Channel Function(TAction)? channelChooser,
+    Channel Function(TAction)? channel,
     Duration timeout = const Duration(seconds: 10),
     bool subscribeable = true
   }) => dispatch(
-    actionChooser: actionChooser,
-    parameter: parameter,
+    action: action,
+    param: param,
     begin: begin,
     end: end,
-    channelChooser: channelChooser,
+    channel: channel,
     timeout: timeout,
     subscribeable: subscribeable
   );
 
   void dispatch<TParam, TResult, TAction extends Action<TParam, TResult>> ({
-    required ActionDescriptor<TAction, TParam, TResult> Function(TActionDirectory set) actionChooser,
-    TParam? parameter,
+    required ActionDescriptor<TAction, TParam, TResult> Function(TActionDirectory set) action,
+    TParam? param,
     Function? begin,
     Function? end,
-    Channel Function(TAction)? channelChooser,
+    Channel Function(TAction)? channel,
     Duration timeout = const Duration(seconds: 10),
     bool subscribeable = true
   }) {
@@ -68,13 +68,13 @@ abstract class ActionBox<TActionDirectory extends ActionDirectory> {
 
     try {
 
-      final descriptor = actionChooser.call(getActionDirectory<TActionDirectory>());
-      final action = descriptor.action;
-      final actionStream = action
-          .process(parameter)
+      final descriptor = action.call(getActionDirectory<TActionDirectory>());
+      final action$ = descriptor.action;
+      final actionStream = action$
+          .process(param)
           .timeout(timeout)
           .onErrorResume((error, stackTrace) {
-        TransformedResult transformedResult = action.transform(error);
+        TransformedResult transformedResult = action$.transform(error);
         if (transformedResult.isTransformed) {
           logWriter?.call('transform() 이 정의되어 에러를 무시하고 데이터로 변환하여 배출합니다.');
           return Stream<TResult>.value(transformedResult.result);
@@ -94,11 +94,11 @@ abstract class ActionBox<TActionDirectory extends ActionDirectory> {
         });
       } else {
         // 별도의 채널을 요청하지 않았으면 기본채널 선택
-        final channel = channelChooser?.call(action) ?? action.defaultChannel;
+        final channel$ = channel?.call(action$) ?? action$.defaultChannel;
 
         // 채널 추가
         final ob = actionStream.flatMap<Pair<Channel, TResult?>>((x) =>
-            Stream.value(Pair(channel, x)));
+            Stream.value(Pair(channel$, x)));
 
         // 채널에 해당하는 액션에 데이터 배출
         temporalSubscription = ob.listen((result) {
@@ -115,32 +115,32 @@ abstract class ActionBox<TActionDirectory extends ActionDirectory> {
   }
 
   StreamSubscription subscribe<TParam, TResult, TAction extends Action<TParam, TResult>> ({
-    required ActionDescriptor<TAction, TParam, TResult> Function(TActionDirectory set) actionChooser,
+    required ActionDescriptor<TAction, TParam, TResult> Function(TActionDirectory set) action,
     required Function(TResult) onNext,
-    Channel Function(TAction)? channelChooser,
+    Channel Function(TAction)? channel,
     Stream<TResult>? Function(Stream<TResult>)? streamHandler,
     TResult Function(TResult)? copyResult,
   }) {
 
     return toStream(
-        actionChooser: actionChooser,
-        channelChooser: channelChooser,
+        action: action,
+        channel: channel,
         streamHandler: streamHandler,
         copyResult: copyResult
     ).listen(onNext);
   }
 
   static Stream<TResult> toStream<TParam, TResult, TAction extends Action<TParam, TResult>, TActionDirectory extends ActionDirectory> ({
-    required ActionDescriptor<TAction, TParam, TResult> Function(TActionDirectory set) actionChooser,
-    Channel Function(TAction)? channelChooser,
+    required ActionDescriptor<TAction, TParam, TResult> Function(TActionDirectory set) action,
+    Channel Function(TAction)? channel,
     Stream<TResult>? Function(Stream<TResult>)? streamHandler,
     TResult Function(TResult)? copyResult,
   }) {
     final actionDirectory = getActionDirectory<TActionDirectory>();
-    final descriptor = actionChooser.call(actionDirectory);
-    final action = descriptor.action;
+    final descriptor = action.call(actionDirectory);
+    final action$ = descriptor.action;
     // 별도의 채널을 요청하지 않았으면 기본채널 선택
-    final channels = (channelChooser?.call(action) ?? action.defaultChannel).ids.toSet();
+    final channels = (channel?.call(action$) ?? action$.defaultChannel).ids.toSet();
     // 액션에 해당하는 소스 선택
     final source = descriptor.pipeline
         .where((x) => x.key.ids.toSet().intersection(channels).isNotEmpty)

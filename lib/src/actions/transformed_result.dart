@@ -1,9 +1,6 @@
 class TransformedResult<TResult> {
-  final TResult _result;
-  TResult get result => _result;
+  final TResult result;
+  final bool isTransformed;
 
-  final bool _isTransformed;
-  bool get isTransformed => _isTransformed;
-
-  TransformedResult(this._isTransformed, this._result);
+  TransformedResult(this.isTransformed, this.result);
 }
