@@ -8,6 +8,6 @@ export 'src/actions/action.dart';
 export 'src/actions/action_descriptor.dart';
 export 'src/actions/action_directory.dart';
 export 'src/actions/transformed_result.dart';
-export 'src/annotations/action_center_config.dart';
+export 'src/annotations/action_box_config.dart';
 export 'src/annotations/action_config.dart';
 export 'src/channels/channel.dart';
