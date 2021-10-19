@@ -10,9 +10,9 @@ import 'package:action_box/action_box.dart';
 import 'example.config.dart';
 
 @ActionBoxConfig(
-    actionBoxTypeName: 'MyActionBox',
-    actionRootTypeName: 'ActionRoot',
-    generateForDir: ['*']
+    actionBoxType: 'MyActionBox',
+    actionRootType: 'ActionRoot',
+    generateSourceDir: ['*']
 )
 final actionBox = MyActionBox.instance;
 

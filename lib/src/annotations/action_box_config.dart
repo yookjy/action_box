@@ -1,13 +1,13 @@
 
 class ActionBoxConfig {
-  final String actionBoxTypeName;
-  final String actionRootTypeName;
-  final List<String> generateForDir;
+  final String actionBoxType;
+  final String actionRootType;
+  final List<String> generateSourceDir;
 
   const ActionBoxConfig({
-    required this.actionBoxTypeName,
-    this.actionRootTypeName = 'ActionRoot',
-    this.generateForDir = const ['lib']});
+    required this.actionBoxType,
+    this.actionRootType = 'ActionRoot',
+    this.generateSourceDir = const ['lib']});
 }
 
 

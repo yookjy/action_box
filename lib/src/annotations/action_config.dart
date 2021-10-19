@@ -1,11 +1,11 @@
 
 class ActionConfig {
-  final String registerTo;
-  final String descriptorName;
+  final List<String> parents;
+  final String alias;
 
   const ActionConfig({
-    required this.descriptorName,
-    this.registerTo = 'root'
+    required this.alias,
+    this.parents = const []
   });
 }
 
