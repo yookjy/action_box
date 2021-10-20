@@ -14,5 +14,3 @@ class Channel {
     return Channel._from(ids + other.ids);
   }
 }
-
-

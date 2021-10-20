@@ -1,4 +1,3 @@
-
 import 'package:action_box/src/actions/transformed_result.dart';
 import 'package:action_box/src/channels/channel.dart';
 
@@ -10,6 +9,5 @@ abstract class Action<TParam, TResult> {
 
   Stream<TResult?> process([TParam? param]);
 
-  final Channel _channel = Channel();
-  Channel get defaultChannel => _channel;
+  final Channel defaultChannel = Channel();
 }
