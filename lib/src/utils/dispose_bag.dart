@@ -24,8 +24,8 @@ class DisposeBag extends Disposable {
     _bag.clear();
   }
 
-  void _add<T>(T disposable, [String? key]) {
-    var id = (key?.isNotEmpty == true) ? key! : disposable.hashCode.toString();
+  void add<T>(T disposable, [String? key]) {
+    var id = (key?.isNotEmpty == true) ? key! : createKey(disposable);
     if (_bag.containsKey(id)) {
       throw ArgumentError('키가 중복되었습니다.');
     }
@@ -33,18 +33,20 @@ class DisposeBag extends Disposable {
   }
 
   bool containsKey(String key) => _bag.containsKey(key);
+
+  String createKey<T>(T disposable) => disposable.hashCode.toString();
 }
 
 extension StreamSubscriptionExtension on StreamSubscription {
   StreamSubscription disposedBy(DisposeBag bag, [String? key]) {
-    bag._add(this, key);
+    bag.add(this, key);
     return this;
   }
 }
 
 extension SubjectBagExtension on Subject {
   T disposedBy<T extends Subject>(DisposeBag bag, [String? key]) {
-    bag._add(this, key);
+    bag.add(this, key);
     return this as T;
   }
 }
