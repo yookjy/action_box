@@ -11,3 +11,5 @@ export 'src/actions/transformed_result.dart';
 export 'src/annotations/action_box_config.dart';
 export 'src/annotations/action_config.dart';
 export 'src/channels/channel.dart';
+export 'src/utils/disposable.dart';
+export 'src/utils/dispose_bag.dart';

@@ -5,6 +5,7 @@ import 'package:action_box/src/actions/action_descriptor.dart';
 import 'package:action_box/src/actions/action_directory.dart';
 import 'package:action_box/src/actions/transformed_result.dart';
 import 'package:action_box/src/channels/channel.dart';
+import 'package:action_box/src/utils/cloneable.dart';
 import 'package:action_box/src/utils/pair.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -38,26 +39,7 @@ abstract class ActionBox<TActionDirectory extends ActionDirectory> {
     _actionDirectory = actionDirectory;
   }
 
-  void call<TParam, TResult, TAction extends Action<TParam, TResult>>(
-          {required ActionDescriptor<TAction, TParam, TResult> Function(
-                  TActionDirectory set)
-              action,
-          TParam? param,
-          Function? begin,
-          Function? end,
-          Channel Function(TAction)? channel,
-          Duration timeout = const Duration(seconds: 10),
-          bool subscribeable = true}) =>
-      dispatch(
-          action: action,
-          param: param,
-          begin: begin,
-          end: end,
-          channel: channel,
-          timeout: timeout,
-          subscribeable: subscribeable);
-
-  void dispatch<TParam, TResult, TAction extends Action<TParam, TResult>>(
+  void go<TParam, TResult, TAction extends Action<TParam, TResult>>(
       {required ActionDescriptor<TAction, TParam, TResult> Function(
               TActionDirectory set)
           action,
@@ -116,35 +98,13 @@ abstract class ActionBox<TActionDirectory extends ActionDirectory> {
     }
   }
 
-  StreamSubscription
-      subscribe<TParam, TResult, TAction extends Action<TParam, TResult>>({
-    required ActionDescriptor<TAction, TParam, TResult> Function(
-            TActionDirectory set)
-        action,
-    required Function(TResult) onNext,
-    Channel Function(TAction)? channel,
-    Stream<TResult>? Function(Stream<TResult>)? streamHandler,
-    TResult Function(TResult)? copyResult,
-  }) {
-    return toStream(
-            action: action,
-            channel: channel,
-            streamHandler: streamHandler,
-            copyResult: copyResult)
-        .listen(onNext);
-  }
-
-  static Stream<TResult> toStream<
-      TParam,
-      TResult,
-      TAction extends Action<TParam, TResult>,
-      TActionDirectory extends ActionDirectory>({
+  Stream<TResult>
+      call<TParam, TResult, TAction extends Action<TParam, TResult>>({
     required ActionDescriptor<TAction, TParam, TResult> Function(
             TActionDirectory set)
         action,
     Channel Function(TAction)? channel,
     Stream<TResult>? Function(Stream<TResult>)? streamHandler,
-    TResult Function(TResult)? copyResult,
   }) {
     final actionDirectory = getActionDirectory<TActionDirectory>();
     final descriptor = action.call(actionDirectory);
@@ -159,13 +119,6 @@ abstract class ActionBox<TActionDirectory extends ActionDirectory> {
             (x) => x.value == null ? Stream.empty() : Stream.value(x.value!));
 
     final stream = streamHandler?.call(source) ?? source;
-    return stream.map((x) {
-      var value = x;
-      //배출할 데이터 복사
-      if (copyResult != null) {
-        value = copyResult.call(value);
-      }
-      return value;
-    });
+    return stream.map((x) => x is Cloneable ? x.clone() : x);
   }
 }

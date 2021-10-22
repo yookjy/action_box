@@ -6,8 +6,8 @@ A simple usage example:
 
 ```dart
 import 'package:action_box/action_box.dart';
-//add
-import 'example.config.dart';
+//add generated file
+import 'example.a.b.dart';
 
 @ActionBoxConfig(
     actionBoxType: 'MyActionBox',
@@ -18,7 +18,7 @@ final actionBox = MyActionBox.instance;
 
 void howToUse() {
   //request data
-  actionBox.dispatch(action: (d) => d.valueConverter.getStringInStringOutValue);
+  actionBox.go(action: (d) => d.valueConverter.getStringInStringOutValue);
   //or
   actionBox(
     action: (root) => root.valueConverter.getStringInStringOutValue,
@@ -26,7 +26,7 @@ void howToUse() {
   );
 
   //subscribe result
-  actionBox.subscribe(
+  actionBox(
       action: (d) => d.valueConverter.getStringInStringOutValue,
       onNext: (String result) {
         print(result);
