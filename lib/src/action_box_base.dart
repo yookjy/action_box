@@ -48,14 +48,13 @@ abstract class ActionBox<TActionDirectory extends ActionDirectory> {
       Function? end,
       Channel Function(TAction)? channel,
       Duration timeout = const Duration(seconds: 10),
-      bool subscribeable = true}) {
+      bool subscribeable = true}) async {
     begin?.call();
 
     try {
       final descriptor = action.call(getActionDirectory<TActionDirectory>());
       final action$ = descriptor.action;
-      final actionStream = action$
-          .process(param)
+      final actionStream = (await action$.process(param))
           .timeout(timeout)
           .onErrorResume((error, stackTrace) {
         TransformedResult transformedResult = action$.transform(error);

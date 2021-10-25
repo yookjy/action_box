@@ -13,7 +13,7 @@ import 'my_action_box.dart';
 //     generateSourceDir: ['lib', 'example'])
 final actionBox = MyActionBox.instance;
 
-void main() {
+void main() async {
   var bag = DisposeBag();
   actionBox(action: (r) => r.valueConverter.getStringToListValue)
       .listen((result) {
@@ -24,6 +24,7 @@ void main() {
       action: (r) => r.valueConverter.getStringToListValue,
       param: 'action box test!');
 
+  await Future.delayed(Duration(seconds: 10));
   //call dispose method when completed
-  //bag.dispose();
+  bag.dispose();
 }
