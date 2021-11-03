@@ -1,12 +1,21 @@
 import 'dart:async';
 import 'dart:collection';
 
+import 'package:action_box/action_box.dart';
 import 'package:action_box/src/actions/action.dart';
 import 'package:action_box/src/actions/action_descriptor.dart';
 
-abstract class ActionDirectory {
-  late Map<String, ActionDescriptor> _actionDescriptors;
+// abstract class ActionRoot$ extends ActionDirectory {
+//   late final StreamController _errorStreamController = _errorStreamFactory?.call() ?? StreamController.broadcast();
+//   final StreamController Function()? _errorStreamFactory;
+//
+//   ActionRoot$(this._errorStreamFactory) : super();
+//
+//   Stream get exceptionStream => _errorStreamController.stream;
+// }
 
+abstract class ActionDirectory implements Disposable {
+  late Map<String, ActionDescriptor> _actionDescriptors;
   late List<ActionDirectory> _actionDirectory;
 
   ActionDirectory() {
@@ -47,9 +56,17 @@ abstract class ActionDirectory {
     return actionBinder;
   }
 
+  @override
   FutureOr dispose() {
-    _actionDescriptors.forEach((key, value) {
-      value.dispose();
+    _actionDescriptors.forEach((key, descriptor) {
+      descriptor.dispose();
     });
+
+    _actionDirectory.forEach((directory) {
+      directory.dispose();
+    });
+
+    _actionDescriptors.clear();
+    _actionDirectory.clear();
   }
 }

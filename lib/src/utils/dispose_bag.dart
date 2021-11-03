@@ -18,8 +18,7 @@ class DisposeBag extends Disposable {
         pair.value.close();
       }
 
-      log('${pair.key} : ${pair.value.runtimeType.toString()} 인스턴스가 해제 되었습니다.',
-          level: 1200);
+      log('${pair.key} : ${pair.value.runtimeType.toString()}\'s instance has been released.');
     });
     _bag.clear();
   }
@@ -27,7 +26,7 @@ class DisposeBag extends Disposable {
   void add<T>(T disposable, [String? key]) {
     var id = (key?.isNotEmpty == true) ? key! : createKey(disposable);
     if (_bag.containsKey(id)) {
-      throw ArgumentError('키가 중복되었습니다.');
+      throw ArgumentError('Duplicated key for disposable object.');
     }
     _bag[id] = disposable;
   }

@@ -1,28 +1,57 @@
+import 'dart:async';
+
 import 'package:action_box/action_box.dart';
+// import 'package:rxdart/rxdart.dart';
 
-import 'my_action_box.dart';
+import 'action_box.dart';
 
+//import 'package:rxdart/rxdart.dart';
 // You can use code generator. https://pub.dev/packages/action_box_generator
 // If you use a generator, the following files are automatically created.
 //  => action descriptor(directory) files : value_converter.dart, action_root.dart
-//  => my_action_box.dart
-//
-// @ActionBoxConfig(
-//     actionBoxType: 'SpcActionBox',
-//     actionRootType: 'ActionRoot',
-//     generateSourceDir: ['lib', 'example'])
-final actionBox = MyActionBox.instance;
+//  => action_box.dart
+@ActionBoxConfig(
+    //actionRootType: 'ActionRoot', //optional
+    generateSourceDir: ['lib', 'example']) //optional
+final actionBox = ActionBox.shared(() => StreamController.broadcast()
+    // You can use rx dart's operator to avoid duplication of errors.
+    // () => PublishSubject()
+    // ..bufferTime(Duration(milliseconds: 500))
+    //   .where((x) => x.isNotEmpty)
+    //   .flatMap((x) =>
+    //   (x as PublishSubject<Object>).distinct((pre, cur) => pre == cur))
+    );
 
 void main() async {
   var bag = DisposeBag();
-  actionBox(action: (r) => r.valueConverter.getStringToListValue)
+
+  //receive result
+  actionBox((a) => a.valueConverter.getStringToListValue)
+      .map()
       .listen((result) {
     result?.forEach((v) => print(v));
   }).disposedBy(bag);
 
-  actionBox.go(
-      action: (r) => r.valueConverter.getStringToListValue,
-      param: 'action box test!');
+  actionBox((a) => a.valueConverter.getStringToListValue)
+      .map(channel: (a) => a.ch1 | a.defaultChannel)
+      .listen((result) {
+    result?.forEach((v) => print(v));
+  }).disposedBy(bag);
+
+  actionBox((a) => a.valueConverter.getStringToListValue)
+      .map(channel: (a) => a.ch1)
+      .listen((result) {
+    result?.forEach((v) => print(v));
+  }).disposedBy(bag);
+
+  //request data
+  actionBox((a) => a.valueConverter.getStringToListValue).go(
+      channel: (c) => c.ch1,
+      param: 'value',
+      begin: () {/* before dispatching */},
+      end: () {/* after dispatching */},
+      timeout: Duration(seconds: 10),
+      subscribeable: true);
 
   await Future.delayed(Duration(seconds: 10));
   //call dispose method when completed

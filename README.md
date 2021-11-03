@@ -16,22 +16,22 @@ import 'example.a.b.dart';
 )
 final actionBox = MyActionBox.instance;
 
-void howToUse() {
-  //request data
-  actionBox.go(action: (d) => d.valueConverter.getStringInStringOutValue);
-  //or
-  actionBox(
-    action: (root) => root.valueConverter.getStringInStringOutValue,
-    param: 'test',
-  );
+void howToUse() async {
+  var bag = DisposeBag();
+  //receive result
+  actionBox(action: (r) => r.valueConverter.getStringToListValue)
+      .listen((result) {
+    result?.forEach((v) => print(v));
+  }).disposedBy(bag);
 
-  //subscribe result
-  actionBox(
-      action: (d) => d.valueConverter.getStringInStringOutValue,
-      onNext: (String result) {
-        print(result);
-      }
-  );
+  //request data
+  actionBox.go(
+      action: (r) => r.valueConverter.getStringToListValue,
+      param: 'action box test!');
+
+  await Future.delayed(Duration(seconds: 10));
+  //call dispose method when completed
+  bag.dispose();
 }
 ```
 
