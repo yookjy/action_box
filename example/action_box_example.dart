@@ -13,7 +13,7 @@ import 'action_box.dart';
 @ActionBoxConfig(
     //actionRootType: 'ActionRoot', //optional
     generateSourceDir: ['lib', 'example']) //optional
-final actionBox = ActionBox.shared(() => StreamController.broadcast()
+final actionBox = ActionBox.shared(
     // You can use rx dart's operator to avoid duplication of errors.
     // () => PublishSubject()
     // ..bufferTime(Duration(milliseconds: 500))

@@ -8,11 +8,11 @@ import 'package:action_box/src/utils/tuple.dart';
 abstract class ActionBoxBase<TActionDirectory extends ActionDirectory> {
   late final TActionDirectory _root = _rootFactory.call();
   late final TActionDirectory Function() _rootFactory;
-  late final StreamController<Object>? _errorStreamController =
+  late final StreamController? _errorStreamController =
       _errorStreamFactory?.call();
-  final StreamController<Object> Function()? _errorStreamFactory;
+  final StreamController Function()? _errorStreamFactory;
 
-  Stream<Object> get exceptionStream => _errorStreamController!.stream;
+  Stream get exceptionStream => _errorStreamController!.stream;
 
   ActionBoxBase(this._rootFactory, this._errorStreamFactory);
 
