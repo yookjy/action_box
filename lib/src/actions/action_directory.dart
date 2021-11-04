@@ -16,13 +16,12 @@ abstract class ActionDirectory implements Disposable {
 
   TActionDirectory
       putIfAbsentDirectory<TActionDirectory extends ActionDirectory>(
-      String directoryKey, TActionDirectory Function() factory) {
+          String directoryKey, TActionDirectory Function() factory) {
     if (directoryKey.isEmpty) {
       throw ArgumentError.value(directoryKey);
     }
-    final directory = _actionDirectories.putIfAbsent(directoryKey,
-            () => factory())
-    as TActionDirectory;
+    final directory = _actionDirectories.putIfAbsent(
+        directoryKey, () => factory()) as TActionDirectory;
 
     return directory;
   }

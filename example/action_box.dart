@@ -7,11 +7,12 @@ import 'string_to_list.dart';
 class ActionBox extends ActionBoxBase<_ActionRoot> {
   static ActionBox? _instance;
   ActionBox._(StreamController<dynamic> Function()? errorStreamFactory)
-      : super(() => _ActionRoot(), errorStreamFactory ?? () => StreamController.broadcast());
+      : super(() => _ActionRoot(),
+            errorStreamFactory ?? () => StreamController.broadcast());
 
-  factory ActionBox.shared({
-      StreamController<dynamic> Function()? errorStreamFactory}) =>
-    _instance ??= ActionBox._(errorStreamFactory);
+  factory ActionBox.shared(
+          {StreamController<dynamic> Function()? errorStreamFactory}) =>
+      _instance ??= ActionBox._(errorStreamFactory);
 
   @override
   void dispose() {
