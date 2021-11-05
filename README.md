@@ -10,24 +10,24 @@ import 'package:action_box/action_box.dart';
 import 'example.a.b.dart';
 
 @ActionBoxConfig(
-    actionBoxType: 'MyActionBox',
-    actionRootType: 'ActionRoot',
+    //actionBoxType: 'ActionBox',
+    //actionRootType: 'ActionRoot',
     generateSourceDir: ['*']
 )
-final actionBox = MyActionBox.instance;
+final actionBox = ActionBox.shared();
 
 void howToUse() async {
   var bag = DisposeBag();
   //receive result
-  actionBox(action: (r) => r.valueConverter.getStringToListValue)
-      .listen((result) {
+  actionBox((r) => r.valueConverter.getStringToListValue)
+    .map()
+    .listen((result) {
     result?.forEach((v) => print(v));
   }).disposedBy(bag);
 
   //request data
-  actionBox.go(
-      action: (r) => r.valueConverter.getStringToListValue,
-      param: 'action box test!');
+  actionBox((r) => r.valueConverter.getStringToListValue)
+    .go(param: 'action box test!');
 
   await Future.delayed(Duration(seconds: 10));
   //call dispose method when completed
