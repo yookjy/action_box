@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:action_box/src/utils/disposable.dart';
-import 'package:rxdart/rxdart.dart';
 
 class DisposeBag extends Disposable {
   final Map _bag = {};
@@ -14,7 +13,7 @@ class DisposeBag extends Disposable {
         pair.value.dispose();
       } else if (pair.value is StreamSubscription) {
         pair.value.cancel();
-      } else if (pair.value is Subject) {
+      } else if (pair.value is StreamSink) {
         pair.value.close();
       }
 
@@ -43,8 +42,8 @@ extension StreamSubscriptionExtension on StreamSubscription {
   }
 }
 
-extension SubjectBagExtension on Subject {
-  T disposedBy<T extends Subject>(DisposeBag bag, [String? key]) {
+extension SubjectBagExtension on StreamSink {
+  T disposedBy<T extends StreamSink>(DisposeBag bag, [String? key]) {
     bag.add(this, key);
     return this as T;
   }
