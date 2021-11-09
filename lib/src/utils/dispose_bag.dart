@@ -6,6 +6,10 @@ import 'package:action_box/src/utils/disposable.dart';
 class DisposeBag extends Disposable {
   final Map _bag = {};
 
+  final Function(Object)? additionalDisposer;
+
+  DisposeBag({this.additionalDisposer});
+
   @override
   void dispose() {
     _bag.entries.forEach((pair) {
@@ -15,6 +19,8 @@ class DisposeBag extends Disposable {
         pair.value.cancel();
       } else if (pair.value is StreamSink) {
         pair.value.close();
+      } else {
+        additionalDisposer?.call(pair.value);
       }
 
       log('${pair.key} : ${pair.value.runtimeType.toString()}\'s instance has been released.');

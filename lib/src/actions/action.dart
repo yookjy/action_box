@@ -14,10 +14,10 @@ abstract class Action<TParam, TResult> implements Disposable {
   StreamController<Tuple2<Channel, TResult?>> createPipeline() =>
       StreamController.broadcast();
 
-  FutureOr<Stream<TResult?>> process([TParam? param]);
+  FutureOr<Stream<TResult>> process([TParam? param]);
 
   TransformedResult<TResult?> transform(Object error) {
-    return TransformedResult(false, null);
+    return TransformedResult<TResult?>(false, null);
   }
 
   @override
