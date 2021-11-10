@@ -91,8 +91,8 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
         .toSet();
     // 액션에 해당하는 소스 선택
     final source = _descriptor._action.pipeline.stream
-        .where((x) => x.value1.ids.toSet().intersection(channels).isNotEmpty)
-        .map<TResult?>((x) => x.value2);
+        .where((x) => x.item1.ids.toSet().intersection(channels).isNotEmpty)
+        .map<TResult?>((x) => x.item2);
     return source.map((x) => x is Cloneable ? x.clone() : x);
   }
 }
