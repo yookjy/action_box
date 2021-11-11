@@ -29,7 +29,7 @@ class _ActionRoot extends ActionDirectory {
 class _ValueConverter extends ActionDirectory {
   _ValueConverter() : super();
 
-  ActionDescriptor<StringToList, String, List<String?>>
+  ActionDescriptor<StringToList, String, List<String>>
       get getStringToListValue =>
           putIfAbsentDescriptor('getStringToListValue', () => StringToList());
 }
