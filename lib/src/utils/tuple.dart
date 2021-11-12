@@ -14,7 +14,7 @@ class Tuple2<T1, T2> {
   int get hashCode => Object.hash(item1.hashCode, item2.hashCode);
 }
 
-class Tuple3<T1, T2, T3>{
+class Tuple3<T1, T2, T3> {
   final T1 item1;
   final T2 item2;
   final T3 item3;
@@ -28,7 +28,8 @@ class Tuple3<T1, T2, T3>{
       other.item1 == item1 && other.item2 == item2 && other.item3 == item3;
 
   @override
-  int get hashCode => Object.hash(item1.hashCode, item2.hashCode, item3.hashCode);
+  int get hashCode =>
+      Object.hash(item1.hashCode, item2.hashCode, item3.hashCode);
 }
 
 class Tuple4<T1, T2, T3, T4> {
@@ -43,12 +44,14 @@ class Tuple4<T1, T2, T3, T4> {
 
   @override
   bool operator ==(covariant Tuple4<T1, T2, T3, T4> other) =>
-      other.item1 == item1 && other.item2 == item2 &&
-          other.item3 == item3 && other.item4 == item4;
+      other.item1 == item1 &&
+      other.item2 == item2 &&
+      other.item3 == item3 &&
+      other.item4 == item4;
 
   @override
-  int get hashCode => Object.hash(item1.hashCode, item2.hashCode,
-      item3.hashCode, item4.hashCode);
+  int get hashCode => Object.hash(
+      item1.hashCode, item2.hashCode, item3.hashCode, item4.hashCode);
 }
 
 class Tuple5<T1, T2, T3, T4, T5> {
@@ -64,8 +67,11 @@ class Tuple5<T1, T2, T3, T4, T5> {
 
   @override
   bool operator ==(covariant Tuple5<T1, T2, T3, T4, T5> other) =>
-      other.item1 == item1 && other.item2 == item2 &&
-          other.item3 == item3 && other.item4 == item4 && other.item5 == item5;
+      other.item1 == item1 &&
+      other.item2 == item2 &&
+      other.item3 == item3 &&
+      other.item4 == item4 &&
+      other.item5 == item5;
 
   @override
   int get hashCode => Object.hash(item1.hashCode, item2.hashCode,

@@ -6,13 +6,16 @@ import 'string_to_list.dart';
 
 class ActionBox extends ActionBoxBase<_ActionRoot> {
   static ActionBox? _instance;
-  ActionBox._(StreamController<dynamic> Function()? errorStreamFactory)
+  ActionBox._(StreamController<dynamic> Function()? errorStreamFactory,
+      Duration? defaultTimeout)
       : super(() => _ActionRoot(),
-            errorStreamFactory ?? () => StreamController.broadcast());
+            errorStreamFactory: errorStreamFactory,
+            defaultTimeout: defaultTimeout);
 
   factory ActionBox.shared(
-          {StreamController<dynamic> Function()? errorStreamFactory}) =>
-      _instance ??= ActionBox._(errorStreamFactory);
+          {StreamController<dynamic> Function()? errorStreamFactory,
+          Duration? defaultTimeout}) =>
+      _instance ??= ActionBox._(errorStreamFactory, defaultTimeout);
 
   @override
   void dispose() {
