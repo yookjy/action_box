@@ -39,6 +39,11 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
     try {
       begin?.call();
 
+      final isNullableParameter = null is TParam;
+      if (!isNullableParameter && param == null) {
+        throw ArgumentError.notNull('action parameter');
+      }
+
       final actionStream = (await _descriptor._action.process(param))
           .timeout(timeout)
           .transform<TResult?>(StreamTransformer.fromHandlers(
