@@ -6,8 +6,6 @@ import 'package:action_box/src/channels/channel.dart';
 import 'package:action_box/src/utils/cloneable.dart';
 import 'package:action_box/src/utils/tuple.dart';
 
-int seconds = 4;
-
 class ActionDescriptor<TAction extends Action<TParam, TResult>, TParam, TResult>
     implements Disposable {
   final TAction Function() _factory;
@@ -31,14 +29,68 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
   final Duration _timeout;
   ActionExecutor(this._descriptor, this._errorSink, this._timeout);
 
+  void echo(
+      {required TResult? value,
+      Function? begin,
+      Function? end,
+      Channel Function(TAction)? channel}) {
+    begin?.call();
+
+    // 별도의 채널을 요청하지 않았으면 기본채널 선택
+    final channel$ = channel?.call(_descriptor._action) ??
+        _descriptor._action.defaultChannel;
+
+    // 채널 추가
+    final ob = Stream.value(Tuple2(channel$, value));
+    StreamSubscription? temporalSubscription;
+
+    // 채널에 해당하는 액션에 데이터 배출
+    temporalSubscription = ob.listen((result) {
+      _descriptor._action.pipeline.add(result);
+      temporalSubscription?.cancel();
+      end?.call();
+    });
+  }
+
+  void waste(
+          {TParam? param,
+          Function? begin,
+          Function? end,
+          Channel Function(TAction)? channel,
+          StreamController? errorSink,
+          Duration? timeout}) =>
+      _dispatch(
+          param: param,
+          begin: begin,
+          end: end,
+          channel: channel,
+          errorSink: errorSink,
+          timeout: timeout,
+          subscribable: false);
+
   void go(
+          {TParam? param,
+          Function? begin,
+          Function? end,
+          Channel Function(TAction)? channel,
+          StreamController? errorSink,
+          Duration? timeout}) =>
+      _dispatch(
+          param: param,
+          begin: begin,
+          end: end,
+          channel: channel,
+          errorSink: errorSink,
+          timeout: timeout);
+
+  void _dispatch(
       {TParam? param,
       Function? begin,
       Function? end,
       Channel Function(TAction)? channel,
       StreamController? errorSink,
       Duration? timeout,
-      bool subscribeable = true}) async {
+      bool subscribable = true}) async {
     var errorStreamSink = errorSink ?? _errorSink;
     try {
       begin?.call();
@@ -62,30 +114,25 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
       }));
 
       StreamSubscription? temporalSubscription;
-      if (!subscribeable) {
-        //더미
-        temporalSubscription = actionStream.listen((_) {
-          temporalSubscription?.cancel();
-          end?.call();
-        });
-      } else {
-        // 별도의 채널을 요청하지 않았으면 기본채널 선택
-        final channel$ = channel?.call(_descriptor._action) ??
-            _descriptor._action.defaultChannel;
 
-        // 채널 추가
-        final ob = actionStream.transform<Tuple2<Channel, TResult?>>(
-            StreamTransformer.fromHandlers(handleData: (x, sink) {
-          sink.add(Tuple2(channel$, x));
-        }));
+      // 별도의 채널을 요청하지 않았으면 기본채널 선택
+      final channel$ = channel?.call(_descriptor._action) ??
+          _descriptor._action.defaultChannel;
 
-        // 채널에 해당하는 액션에 데이터 배출
-        temporalSubscription = ob.listen((result) {
+      // 채널 추가
+      final ob = actionStream.transform<Tuple2<Channel, TResult?>>(
+          StreamTransformer.fromHandlers(handleData: (x, sink) {
+        sink.add(Tuple2(channel$, x));
+      }));
+
+      // 채널에 해당하는 액션에 데이터 배출
+      temporalSubscription = ob.listen((result) {
+        if (subscribable) {
           _descriptor._action.pipeline.add(result);
-          temporalSubscription?.cancel();
-          end?.call();
-        });
-      }
+        }
+        temporalSubscription?.cancel();
+        end?.call();
+      });
     } catch (error) {
       errorStreamSink?.add(error);
       end?.call();

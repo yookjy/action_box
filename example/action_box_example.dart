@@ -54,8 +54,14 @@ void main() async {
       param: 'value',
       begin: () {/* before dispatching */},
       end: () {/* after dispatching */},
-      timeout: Duration(seconds: 10),
-      subscribeable: true);
+      timeout: Duration(seconds: 10));
+
+  actionBox((a) => a.valueConverter.getStringToListValue)
+      .echo(value: ['e', 'c', 'h', 'o']);
+
+  actionBox((a) => a.valueConverter.getStringToListValue).waste(
+    param: 'waste',
+  );
 
   await Future.delayed(Duration(seconds: 10));
   //call dispose method when completed
