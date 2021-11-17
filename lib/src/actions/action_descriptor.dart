@@ -29,6 +29,14 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
   final Duration _timeout;
   ActionExecutor(this._descriptor, this._errorSink, this._timeout);
 
+  ActionExecutor<TParam, TResult, TAction> when(bool Function() test,
+      Function(ActionExecutor<TParam, TResult, TAction>) executor) {
+    if (test()) {
+      executor.call(this);
+    }
+    return this;
+  }
+
   void echo(
       {required TResult? value,
       Function? begin,

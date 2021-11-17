@@ -57,7 +57,9 @@ void main() async {
       timeout: Duration(seconds: 10));
 
   actionBox((a) => a.valueConverter.getStringToListValue)
-      .echo(value: ['e', 'c', 'h', 'o']);
+      .when(() => true, (a) => a.echo(value: ['e', 'c', 'h', 'o']))
+      .when(() => false, (a) => a.waste(param: 'ignore'))
+      .go(param: 'real value');
 
   actionBox((a) => a.valueConverter.getStringToListValue).waste(
     param: 'waste',
