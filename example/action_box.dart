@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:action_box/action_box.dart';
 
+import 'string_to_char.dart';
 import 'string_to_list.dart';
 
 class ActionBox extends ActionBoxBase<_ActionRoot> {
@@ -35,4 +36,7 @@ class _ValueConverter extends ActionDirectory {
   ActionDescriptor<StringToList, String, List<String>>
       get getStringToListValue =>
           putIfAbsentDescriptor('getStringToListValue', () => StringToList());
+
+  ActionDescriptor<StringToChar, String, String> get getStringToCharValue =>
+      putIfAbsentDescriptor('getStringToCharValue', () => StringToChar());
 }

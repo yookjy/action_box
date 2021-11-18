@@ -38,27 +38,15 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
   }
 
   void echo(
-      {required TResult? value,
-      Function? begin,
-      Function? end,
-      Channel Function(TAction)? channel}) {
-    begin?.call();
-
-    // 별도의 채널을 요청하지 않았으면 기본채널 선택
-    final channel$ = channel?.call(_descriptor._action) ??
-        _descriptor._action.defaultChannel;
-
-    // 채널 추가
-    final ob = Stream.value(Tuple2(channel$, value));
-    StreamSubscription? temporalSubscription;
-
-    // 채널에 해당하는 액션에 데이터 배출
-    temporalSubscription = ob.listen((result) {
-      _descriptor._action.pipeline.add(result);
-      temporalSubscription?.cancel();
-      end?.call();
-    });
-  }
+          {required TResult? value,
+          Function? begin,
+          Function? end,
+          Channel Function(TAction)? channel}) =>
+      _dispatch(
+          result: Stream.value(value),
+          begin: begin,
+          end: end,
+          channel: channel);
 
   void waste(
           {TParam? param,
@@ -93,6 +81,7 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
 
   void _dispatch(
       {TParam? param,
+      Stream<TResult?>? result,
       Function? begin,
       Function? end,
       Channel Function(TAction)? channel,
@@ -103,43 +92,47 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
     try {
       begin?.call();
 
-      final isNullableParameter = null is TParam;
-      if (!isNullableParameter && param == null) {
+      // validate mandatory parameter
+      if (result == null && !(null is TParam) && param == null) {
         throw ArgumentError.notNull('action parameter');
       }
 
-      final actionStream = (await _descriptor._action.process(param))
-          .timeout(timeout ?? _timeout)
-          .transform<TResult?>(StreamTransformer.fromHandlers(
-              handleError: (error, stackTrace, EventSink<TResult?> sink) {
-        final transformedResult = _descriptor._action.transform(error);
-        if (transformedResult.isTransformed) {
-          sink.add(transformedResult.result);
-          return;
-        }
-        errorStreamSink?.add(error);
-        end?.call();
-      }));
+      final actionStream = result ??
+          (await _descriptor._action.process(param))
+              .timeout(timeout ?? _timeout)
+              .transform<TResult?>(StreamTransformer.fromHandlers(
+                  handleError: (error, stackTrace, EventSink<TResult?> sink) {
+            final transformedResult = _descriptor._action.transform(error);
+            if (transformedResult.isTransformed) {
+              sink.add(transformedResult.result);
+              return;
+            }
+            errorStreamSink?.add(error);
+            end?.call();
+          }));
 
       StreamSubscription? temporalSubscription;
 
-      // 별도의 채널을 요청하지 않았으면 기본채널 선택
+      // If no channel is specified, the default channel is selected.
       final channel$ = channel?.call(_descriptor._action) ??
           _descriptor._action.defaultChannel;
 
-      // 채널 추가
-      final ob = actionStream.transform<Tuple2<Channel, TResult?>>(
-          StreamTransformer.fromHandlers(handleData: (x, sink) {
+      final ob = actionStream
+          .asBroadcastStream()
+          .transform<Tuple2<Channel, TResult?>>(
+              StreamTransformer.fromHandlers(handleData: (x, sink) {
         sink.add(Tuple2(channel$, x));
       }));
 
-      // 채널에 해당하는 액션에 데이터 배출
-      temporalSubscription = ob.listen((result) {
+      // Emit the executed result of the action to the selected channel.
+      temporalSubscription = ob.listen((result) async {
         if (subscribable) {
           _descriptor._action.pipeline.add(result);
         }
-        temporalSubscription?.cancel();
-        end?.call();
+        if (await ob.isEmpty) {
+          await temporalSubscription?.cancel();
+          end?.call();
+        }
       });
     } catch (error) {
       errorStreamSink?.add(error);
@@ -148,12 +141,12 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
   }
 
   Stream<TResult?> map({Channel Function(TAction)? channel}) {
-    // 별도의 채널을 요청하지 않았으면 기본채널 선택
+    // If no channel is specified, the default channel is selected.
     final channels = (channel?.call(_descriptor._action) ??
             _descriptor._action.defaultChannel)
         .ids
         .toSet();
-    // 액션에 해당하는 소스 선택
+    // Map the selected channel and pipeline of actions.
     final source = _descriptor._action.pipeline.stream
         .where((x) => x.item1.ids.toSet().intersection(channels).isNotEmpty)
         .map<TResult?>((x) => x.item2);

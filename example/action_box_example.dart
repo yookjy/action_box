@@ -58,12 +58,19 @@ void main() async {
 
   actionBox((a) => a.valueConverter.getStringToListValue)
       .when(() => true, (a) => a.echo(value: ['e', 'c', 'h', 'o']))
-      .when(() => false, (a) => a.waste(param: 'ignore'))
+      .when(() => true, (a) => a.waste(param: 'ignore'))
       .go(param: 'real value');
 
   actionBox((a) => a.valueConverter.getStringToListValue).waste(
     param: 'waste',
   );
+
+  actionBox((a) => a.valueConverter.getStringToCharValue).map().listen((v) {
+    print(v);
+  });
+
+  actionBox((a) => a.valueConverter.getStringToCharValue)
+      .go(param: 'This is iterable stream test!');
 
   await Future.delayed(Duration(seconds: 10));
   //call dispose method when completed
