@@ -19,13 +19,13 @@ class ActionDescriptor<TAction extends Action<TParam, TResult>, TParam, TResult>
   }
 
   ActionExecutor<TParam, TResult, TAction> call(
-          StreamController? errorSink, Duration defaultTimeout) =>
+          EventSink errorSink, Duration defaultTimeout) =>
       ActionExecutor(this, errorSink, defaultTimeout);
 }
 
 class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
   final ActionDescriptor<TAction, TParam, TResult> _descriptor;
-  final StreamController? _errorSink;
+  final EventSink _errorSink;
   final Duration _timeout;
   ActionExecutor(this._descriptor, this._errorSink, this._timeout);
 
@@ -38,9 +38,9 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
   }
 
   void echo(
-          {required TResult? value,
+          {required TResult value,
           Function? begin,
-          Function? end,
+          Function(bool)? end,
           Channel Function(TAction)? channel}) =>
       _dispatch(
           result: Stream.value(value),
@@ -51,44 +51,51 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
   void waste(
           {TParam? param,
           Function? begin,
-          Function? end,
+          Function(bool)? end,
           Channel Function(TAction)? channel,
-          StreamController? errorSink,
+          List<EventSink> Function(EventSink global, EventSink pipeline)?
+              errorSinks,
           Duration? timeout}) =>
       _dispatch(
           param: param,
           begin: begin,
           end: end,
           channel: channel,
-          errorSink: errorSink,
+          errorSinks: errorSinks,
           timeout: timeout,
           subscribable: false);
 
   void go(
           {TParam? param,
           Function? begin,
-          Function? end,
+          Function(bool)? end,
           Channel Function(TAction)? channel,
-          StreamController? errorSink,
+          List<EventSink> Function(EventSink global, EventSink pipeline)?
+              errorSinks,
           Duration? timeout}) =>
       _dispatch(
           param: param,
           begin: begin,
           end: end,
           channel: channel,
-          errorSink: errorSink,
+          errorSinks: errorSinks,
           timeout: timeout);
 
   void _dispatch(
       {TParam? param,
-      Stream<TResult?>? result,
+      Stream<TResult>? result,
       Function? begin,
-      Function? end,
+      Function(bool)? end,
       Channel Function(TAction)? channel,
-      StreamController? errorSink,
+      List<EventSink> Function(EventSink global, EventSink pipeline)?
+          errorSinks,
       Duration? timeout,
       bool subscribable = true}) async {
-    var errorStreamSink = errorSink ?? _errorSink;
+    var done = false;
+    var errorStreamSinks =
+        errorSinks?.call(_errorSink, _descriptor._action.pipeline) ??
+            (subscribable ? [_descriptor._action.pipeline] : [_errorSink]);
+
     try {
       begin?.call();
 
@@ -97,46 +104,62 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
         throw ArgumentError.notNull('action parameter');
       }
 
-      final actionStream = result ??
-          (await _descriptor._action.process(param))
-              .timeout(timeout ?? _timeout)
-              .transform<TResult?>(StreamTransformer.fromHandlers(
-                  handleError: (error, stackTrace, EventSink<TResult?> sink) {
-            final transformedResult = _descriptor._action.transform(error);
-            if (transformedResult.isTransformed) {
-              sink.add(transformedResult.result);
-              return;
-            }
-            errorStreamSink?.add(error);
-            end?.call();
-          }));
-
       StreamSubscription? temporalSubscription;
 
       // If no channel is specified, the default channel is selected.
       final channel$ = channel?.call(_descriptor._action) ??
           _descriptor._action.defaultChannel;
 
-      final ob = actionStream
-          .asBroadcastStream()
-          .transform<Tuple2<Channel, TResult?>>(
-              StreamTransformer.fromHandlers(handleData: (x, sink) {
-        sink.add(Tuple2(channel$, x));
-      }));
-
       // Emit the executed result of the action to the selected channel.
-      temporalSubscription = ob.listen((result) async {
+      temporalSubscription =
+          (result ?? (await _descriptor._action.process(param)))
+              .timeout(timeout ?? _timeout)
+              .transform<Tuple2<Channel, TResult?>>(
+                  StreamTransformer.fromHandlers(handleData: (data, sink) {
+                sink.add(Tuple2(channel$, data));
+              }, handleError: (error, stackTrace, sink) {
+                final transformedResult = _descriptor._action.transform(error);
+                if (transformedResult != null) {
+                  sink.add(Tuple2(channel$, transformedResult.result));
+                  return;
+                }
+                sink.addError(error, stackTrace);
+              }))
+              .listen((result) {
+        done = true;
         if (subscribable) {
           _descriptor._action.pipeline.add(result);
+        } else {
+          // ignore
         }
-        if (await ob.isEmpty) {
-          await temporalSubscription?.cancel();
-          end?.call();
-        }
+      }, onError: (error, stackTrace) {
+        errorStreamSinks
+            .where((sink) =>
+                subscribable || (sink != _descriptor._action.pipeline))
+            .forEach((sink) {
+          var err = stackTrace == null ? error : Tuple2(error, stackTrace);
+          _addError(sink, err);
+        });
+      }, onDone: () async {
+        end?.call(done);
+        await temporalSubscription?.cancel();
       });
     } catch (error) {
-      errorStreamSink?.add(error);
-      end?.call();
+      errorStreamSinks
+          .where(
+              (sink) => subscribable || (sink != _descriptor._action.pipeline))
+          .forEach((sink) {
+        _addError(sink, error);
+      });
+      end?.call(done);
+    }
+  }
+
+  void _addError(EventSink eventSink, Object error) {
+    if (eventSink == _descriptor._action.pipeline) {
+      eventSink.addError(error);
+    } else {
+      eventSink.add(error);
     }
   }
 

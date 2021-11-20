@@ -6,7 +6,8 @@ import 'package:action_box/action_box.dart';
 class StringToChar extends Action<String, String> {
   @override
   Stream<String> process([String? param]) {
-    return Stream.fromIterable(
-        param!.codeUnits.map((e) => String.fromCharCode(e)));
+    return Stream.error(Exception('error test'));
+    // return Stream.fromIterable(
+    //     param!.codeUnits.map((e) => String.fromCharCode(e)));
   }
 }

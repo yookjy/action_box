@@ -1,6 +1,6 @@
 name: action_box
 description: This package isolates business logic so that it can be reused.
-version: 0.0.29
+version: 0.0.30
 homepage: https://github.com/yookjy/action_box
 
 environment:

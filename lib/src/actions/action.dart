@@ -16,8 +16,8 @@ abstract class Action<TParam, TResult> implements Disposable {
 
   FutureOr<Stream<TResult>> process([TParam? param]);
 
-  TransformedResult<TResult?> transform(Object error) {
-    return TransformedResult<TResult?>(false, null);
+  TransformedResult<TResult>? transform(Object error) {
+    return null;
   }
 
   @override

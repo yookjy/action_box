@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 
 import 'package:action_box/action_box.dart';
 import 'package:action_box/src/utils/tuple.dart';
@@ -23,7 +24,7 @@ final actionBox = ActionBox.shared(
     //   (x as PublishSubject<Object>).distinct((pre, cur) => pre == cur))
     )
   ..exceptionStream.listen((event) {
-    print(event);
+    print('global error handler => $event');
   });
 
 void main() async {
@@ -53,24 +54,35 @@ void main() async {
       channel: (c) => c.ch1,
       param: 'value',
       begin: () {/* before dispatching */},
-      end: () {/* after dispatching */},
+      end: (success) {/* after dispatching */},
       timeout: Duration(seconds: 10));
 
   actionBox((a) => a.valueConverter.getStringToListValue)
       .when(() => true, (a) => a.echo(value: ['e', 'c', 'h', 'o']))
+      .when(() => true, (a) => a.echo(value: null))
       .when(() => true, (a) => a.waste(param: 'ignore'))
       .go(param: 'real value');
-
+  //
   actionBox((a) => a.valueConverter.getStringToListValue).waste(
-    param: 'waste',
-  );
+      param: 'waste',
+      end: (success) {
+        print(success);
+      });
+
+  var errStream = StreamController()..disposedBy(bag);
+  errStream.stream.listen((event) {
+    print('local => $event');
+  }).disposedBy(bag);
 
   actionBox((a) => a.valueConverter.getStringToCharValue).map().listen((v) {
     print(v);
+  }, onError: (error) {
+    print('onError => $error');
   });
 
-  actionBox((a) => a.valueConverter.getStringToCharValue)
-      .go(param: 'This is iterable stream test!');
+  actionBox((a) => a.valueConverter.getStringToCharValue).go(
+      param: 'This is iterable stream test!',
+      errorSinks: (global, pipeline) => [global, pipeline, errStream]);
 
   await Future.delayed(Duration(seconds: 10));
   //call dispose method when completed
