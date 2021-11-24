@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:action_box/src/utils/disposable.dart';
+import 'package:action_box/src/utils/uuid.dart';
 
 class DisposeBag extends Disposable {
   final Map _bag = {};
@@ -38,7 +39,7 @@ class DisposeBag extends Disposable {
 
   bool containsKey(String key) => _bag.containsKey(key);
 
-  String createKey<T>(T disposable) => disposable.hashCode.toString();
+  String createKey<T>(T disposable) => UUID.v4();
 }
 
 extension StreamSubscriptionExtension on StreamSubscription {
