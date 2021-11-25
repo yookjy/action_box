@@ -51,7 +51,7 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
           end: end,
           channel: channel);
 
-  void waste(
+  void drain(
           {TParam? param,
           Function? begin,
           Function(bool)? end,

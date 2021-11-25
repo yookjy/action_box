@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:action_box/action_box.dart';
 // import 'package:rxdart/rxdart.dart';
@@ -58,10 +60,10 @@ void main() async {
   actionBox((a) => a.valueConverter.getStringToListValue)
       .when(() => true, (a) => a.echo(value: ['e', 'c', 'h', 'o']))
       .when(() => true, (a) => a.echo(value: null))
-      .when(() => true, (a) => a.waste(param: 'ignore'))
+      .when(() => true, (a) => a.drain(param: 'ignore'))
       .go(param: 'real value');
   //
-  actionBox((a) => a.valueConverter.getStringToListValue).waste(
+  actionBox((a) => a.valueConverter.getStringToListValue).drain(
       param: 'waste',
       end: (success) {
         print(success);
@@ -81,6 +83,10 @@ void main() async {
   actionBox((a) => a.valueConverter.getStringToCharValue).go(
       param: 'This is iterable stream test!',
       errorSinks: (global, pipeline) => [global, pipeline, errStream]);
+
+  //var file = File('/Users/yookjy/Downloads/test.json');
+
+
 
   await Future.delayed(Duration(seconds: 10));
   //call dispose method when completed
