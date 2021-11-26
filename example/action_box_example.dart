@@ -84,7 +84,24 @@ void main() async {
       param: 'This is iterable stream test!',
       errorSinks: (global, pipeline) => [global, pipeline, errStream]);
 
-  //var file = File('/Users/yookjy/Downloads/test.json');
+  var file = File('/Users/yookjy/yookjy/Downloads/test.json');
+  // file.openRead().transform(utf8.decoder).listen((event) { })
+  if (!file.existsSync()) {
+    await file.create();
+  }
+  var ioSink = file.openWrite();
+  ioSink.write(jsonEncode({
+    'id': '9f2c7c23-c9f0-4635-8614-8c19753d8468',
+    'expire': DateTime.now().toString()
+  }));
+  await ioSink.flush();
+
+  file.openRead()
+    .transform(utf8.decoder)
+    .transform(LineSplitter())
+    .listen((event) {
+      print(event);
+  });
 
 
 

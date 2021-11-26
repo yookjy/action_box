@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:action_box/action_box.dart';
-import 'package:action_box/src/actions/action.dart';
-import 'package:action_box/src/channels/channel.dart';
+import 'package:action_box/src/cache/cache_storage_provider.dart';
+import 'package:action_box/src/cache/cache_strategy.dart';
+import 'package:action_box/src/core/action.dart';
+import 'package:action_box/src/core/channel.dart';
 import 'package:action_box/src/utils/cloneable.dart';
 import 'package:action_box/src/utils/tuple.dart';
 
@@ -19,15 +21,16 @@ class ActionDescriptor<TAction extends Action<TParam, TResult>, TParam, TResult>
   }
 
   ActionExecutor<TParam, TResult, TAction> call(
-          EventSink errorSink, Duration defaultTimeout) =>
-      ActionExecutor(this, errorSink, defaultTimeout);
+          EventSink errorSink, Duration defaultTimeout, CacheStorageProvider? cacheStorageProvider) =>
+      ActionExecutor(this, errorSink, defaultTimeout, cacheStorageProvider);
 }
 
 class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
   final ActionDescriptor<TAction, TParam, TResult> _descriptor;
   final EventSink _globalErrorSink;
   final Duration _timeout;
-  ActionExecutor(this._descriptor, this._globalErrorSink, this._timeout);
+  CacheStorageProvider? _cacheStorageProvider;
+  ActionExecutor(this._descriptor, this._globalErrorSink, this._timeout, this._cacheStorageProvider);
 
   TAction get _action => _descriptor._action;
   StreamController<Tuple2<Channel, TResult?>> get _pipeline => _action.pipeline;
@@ -110,7 +113,7 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
       final channel$ = _getChannel(channel);
 
       // Emit the executed result of the action to the selected channel.
-      temporalSubscription = (result ?? (await _action.process(param)))
+      temporalSubscription = (result ?? (_cacheStorageProvider != null && true  /*조건*/ ? Stream.value(_cacheStorageProvider!.readCache(_action.defaultChannel.id, CacheStrategy(expire: DateTime.now()))) : await _action.process(param)))
           .timeout(timeout ?? _timeout)
           .transform<Tuple2<Channel, TResult?>>(
               StreamTransformer.fromHandlers(handleData: (data, sink) {

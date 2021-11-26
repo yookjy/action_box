@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:action_box/action_box.dart';
-import 'package:action_box/src/actions/transformed_result.dart';
-import 'package:action_box/src/channels/channel.dart';
+import 'package:action_box/src/core/channel.dart';
+import 'package:action_box/src/core/transformed_result.dart';
 import 'package:action_box/src/utils/tuple.dart';
 
 abstract class Action<TParam, TResult> implements Disposable {

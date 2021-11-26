@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:collection';
 
 import 'package:action_box/action_box.dart';
-import 'package:action_box/src/actions/action.dart';
-import 'package:action_box/src/actions/action_descriptor.dart';
+import 'package:action_box/src/core/action.dart';
+import 'package:action_box/src/core/action_descriptor.dart';
 
 abstract class ActionDirectory implements Disposable {
   late Map<String, ActionDescriptor> _actionDescriptors;

@@ -1,8 +1,9 @@
 import 'dart:async';
 
-import 'package:action_box/src/actions/action.dart';
-import 'package:action_box/src/actions/action_descriptor.dart';
-import 'package:action_box/src/actions/action_directory.dart';
+import 'package:action_box/src/cache/cache_storage_provider.dart';
+import 'package:action_box/src/core/action.dart';
+import 'package:action_box/src/core/action_descriptor.dart';
+import 'package:action_box/src/core/action_directory.dart';
 
 abstract class ActionBoxBase<TActionDirectory extends ActionDirectory> {
   late final TActionDirectory _root = _rootFactory.call();
@@ -13,13 +14,17 @@ abstract class ActionBoxBase<TActionDirectory extends ActionDirectory> {
 
   final Duration _defaultTimeout;
 
+  CacheStorageProvider? _cacheStorageProvider;
+
   Stream get exceptionStream => _errorStreamController.stream;
 
   ActionBoxBase(this._rootFactory,
       {Duration? defaultTimeout,
-      StreamController Function()? errorStreamFactory})
+      StreamController Function()? errorStreamFactory,
+      CacheStorageProvider? cacheStorageProvider})
       : _defaultTimeout = defaultTimeout ?? const Duration(seconds: 3),
-        _errorStreamFactory = errorStreamFactory;
+        _errorStreamFactory = errorStreamFactory,
+        _cacheStorageProvider = cacheStorageProvider;
 
   void dispose() {
     _root.dispose();
@@ -31,6 +36,6 @@ abstract class ActionBoxBase<TActionDirectory extends ActionDirectory> {
           ActionDescriptor<TAction, TParam, TResult> Function(TActionDirectory)
               action) {
     var descriptor = action(_root);
-    return descriptor.call(_errorStreamController, _defaultTimeout);
+    return descriptor.call(_errorStreamController, _defaultTimeout, _cacheStorageProvider);
   }
 }
