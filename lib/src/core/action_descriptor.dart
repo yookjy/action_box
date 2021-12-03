@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:action_box/action_box.dart';
-import 'package:action_box/src/cache/cache_storage_provider.dart';
+import 'package:action_box/src/cache/cache_provider.dart';
+import 'package:action_box/src/cache/cache_storage.dart';
 import 'package:action_box/src/cache/cache_strategy.dart';
 import 'package:action_box/src/core/action.dart';
 import 'package:action_box/src/core/channel.dart';
@@ -21,16 +22,16 @@ class ActionDescriptor<TAction extends Action<TParam, TResult>, TParam, TResult>
   }
 
   ActionExecutor<TParam, TResult, TAction> call(
-          EventSink errorSink, Duration defaultTimeout, CacheStorageProvider? cacheStorageProvider) =>
-      ActionExecutor(this, errorSink, defaultTimeout, cacheStorageProvider);
+          EventSink errorSink, Duration defaultTimeout, CacheProvider cacheProvider) =>
+      ActionExecutor(this, errorSink, defaultTimeout, cacheProvider);
 }
 
 class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
   final ActionDescriptor<TAction, TParam, TResult> _descriptor;
   final EventSink _globalErrorSink;
   final Duration _timeout;
-  CacheStorageProvider? _cacheStorageProvider;
-  ActionExecutor(this._descriptor, this._globalErrorSink, this._timeout, this._cacheStorageProvider);
+  final CacheProvider _cacheProvider;
+  ActionExecutor(this._descriptor, this._globalErrorSink, this._timeout, this._cacheProvider);
 
   TAction get _action => _descriptor._action;
   StreamController<Tuple2<Channel, TResult?>> get _pipeline => _action.pipeline;
@@ -76,6 +77,7 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
           Function? begin,
           Function(bool)? end,
           Channel Function(TAction)? channel,
+          CacheStrategy? cacheStrategy,
           List<EventSink> Function(EventSink global, EventSink pipeline)?
               errorSinks,
           Duration? timeout}) =>
@@ -84,6 +86,7 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
           begin: begin,
           end: end,
           channel: channel,
+          cacheStrategy: cacheStrategy,
           errorSinks: errorSinks,
           timeout: timeout);
 
@@ -93,6 +96,7 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
       Function? begin,
       Function(bool)? end,
       Channel Function(TAction)? channel,
+      CacheStrategy? cacheStrategy,
       List<EventSink> Function(EventSink global, EventSink pipeline)?
           errorSinks,
       Duration? timeout,
@@ -113,11 +117,13 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
       final channel$ = _getChannel(channel);
 
       // Emit the executed result of the action to the selected channel.
-      temporalSubscription = (result ?? (_cacheStorageProvider != null && true  /*조건*/ ? Stream.value(_cacheStorageProvider!.readCache(_action.defaultChannel.id, CacheStrategy(expire: DateTime.now()))) : await _action.process(param)))
+      temporalSubscription = (result ?? await _cacheProvider.readCacheIfAbsent(_action.defaultChannel.id, cacheStrategy, _action.process, param))
+      // temporalSubscription = (result ?? await  _action.process(param))
           .timeout(timeout ?? _timeout)
           .transform<Tuple2<Channel, TResult?>>(
               StreamTransformer.fromHandlers(handleData: (data, sink) {
             sink.add(Tuple2(channel$, data));
+            _cacheProvider.writeCache(_action.defaultChannel.id, cacheStrategy, data, param);
           }, handleError: (error, stackTrace, sink) {
             final transformedResult = _action.transform(error);
             if (transformedResult != null) {

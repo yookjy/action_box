@@ -15,6 +15,7 @@ class StringToList extends Action<String, List<String>?> {
         list.add(param[i]);
       }
     }
+    print('request');
     return Stream.value(list);
   }
 

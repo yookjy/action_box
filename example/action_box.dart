@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:action_box/action_box.dart';
+import 'package:action_box/src/cache/cache_storage.dart';
 
 import 'string_to_char.dart';
 import 'string_to_list.dart';
@@ -8,15 +9,18 @@ import 'string_to_list.dart';
 class ActionBox extends ActionBoxBase<_ActionRoot> {
   static ActionBox? _instance;
   ActionBox._(StreamController<dynamic> Function()? errorStreamFactory,
-      Duration? defaultTimeout)
+      Duration? defaultTimeout,
+      List<CacheStorage>? cacheStorages)
       : super(() => _ActionRoot(),
             errorStreamFactory: errorStreamFactory,
-            defaultTimeout: defaultTimeout);
+            defaultTimeout: defaultTimeout,
+            cacheStorages: cacheStorages);
 
   factory ActionBox.shared(
           {StreamController<dynamic> Function()? errorStreamFactory,
-          Duration? defaultTimeout}) =>
-      _instance ??= ActionBox._(errorStreamFactory, defaultTimeout);
+          Duration? defaultTimeout,
+          List<CacheStorage>? cacheStorageProviders}) =>
+      _instance ??= ActionBox._(errorStreamFactory, defaultTimeout, cacheStorageProviders);
 
   @override
   void dispose() {

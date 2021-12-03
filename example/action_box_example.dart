@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:action_box/action_box.dart';
+import 'package:action_box/src/cache/cache_strategy.dart';
+import 'package:action_box/src/cache/file_cache.dart';
+import 'package:action_box/src/cache/memory_cache.dart';
 // import 'package:rxdart/rxdart.dart';
 
 import 'action_box.dart';
@@ -22,6 +26,7 @@ final actionBox = ActionBox.shared(
     //   .where((x) => x.isNotEmpty)
     //   .flatMap((x) =>
     //   (x as PublishSubject<Object>).distinct((pre, cur) => pre == cur))
+      cacheStorageProviders: [MemoryCache.create(), FileCache.fromPath(Directory.current.path)]
     )
   ..exceptionStream.listen((event) {
     print('global error handler => $event');
@@ -32,57 +37,121 @@ void main() async {
 
   //receive result
   actionBox((a) => a.valueConverter.getStringToListValue)
-      .map()
-      .listen((result) {
-    result?.forEach((v) => print(v));
-  }).disposedBy(bag);
-
-  actionBox((a) => a.valueConverter.getStringToListValue)
-      .map(channel: (a) => a.ch1 | a.defaultChannel)
-      .listen((result) {
-    result?.forEach((v) => print(v));
-  }).disposedBy(bag);
-
-  actionBox((a) => a.valueConverter.getStringToListValue)
       .map(channel: (a) => a.ch1)
       .listen((result) {
     result?.forEach((v) => print(v));
   }).disposedBy(bag);
+  //
+  // actionBox((a) => a.valueConverter.getStringToListValue)
+  //     .map(channel: (a) => a.ch1 | a.defaultChannel)
+  //     .listen((result) {
+  //   result?.forEach((v) => print(v));
+  // }).disposedBy(bag);
+  //
+  // actionBox((a) => a.valueConverter.getStringToListValue)
+  //     .map(channel: (a) => a.ch1)
+  //     .listen((result) {
+  //   result?.forEach((v) => print(v));
+  // }).disposedBy(bag);
 
   //request data
   actionBox((a) => a.valueConverter.getStringToListValue).go(
       channel: (c) => c.ch1,
       param: 'value',
+      cacheStrategy: CacheStrategy(expire: Duration(minutes: 5), cacheStorageType: FileCache),
       begin: () {/* before dispatching */},
       end: (success) {/* after dispatching */},
       timeout: Duration(seconds: 10));
 
-  actionBox((a) => a.valueConverter.getStringToListValue)
-      .when(() => true, (a) => a.echo(value: ['e', 'c', 'h', 'o']))
-      .when(() => true, (a) => a.echo(value: null))
-      .when(() => true, (a) => a.drain(param: 'ignore'))
-      .go(param: 'real value');
+  await Future.delayed(Duration(seconds: 1));
+
+  actionBox((a) => a.valueConverter.getStringToListValue).go(
+      channel: (c) => c.ch1,
+      param: 'value',
+      cacheStrategy: CacheStrategy(expire: Duration(seconds: 2), cacheStorageType: FileCache),
+      begin: () {/* before dispatching */},
+      end: (success) {/* after dispatching */},
+      timeout: Duration(seconds: 10));
+
+  await Future.delayed(Duration(seconds: 2));
+
+  actionBox((a) => a.valueConverter.getStringToListValue).go(
+      channel: (c) => c.ch1,
+      param: 'value',
+      cacheStrategy: CacheStrategy(expire: Duration(seconds: 2), cacheStorageType: FileCache),
+      begin: () {/* before dispatching */},
+      end: (success) {/* after dispatching */},
+      timeout: Duration(seconds: 10));
+
+  // actionBox((a) => a.valueConverter.getStringToListValue)
+  //     .when(() => true, (a) => a.echo(value: ['e', 'c', 'h', 'o']))
+  //     .when(() => true, (a) => a.echo(value: null))
+  //     .when(() => true, (a) => a.drain(param: 'ignore'))
+  //     .go(param: 'real value');
   //
-  actionBox((a) => a.valueConverter.getStringToListValue).drain(
-      param: 'waste',
-      end: (success) {
-        print(success);
-      });
+  // actionBox((a) => a.valueConverter.getStringToListValue).drain(
+  //     param: 'waste',
+  //     end: (success) {
+  //       print(success);
+  //     });
 
-  var errStream = StreamController()..disposedBy(bag);
-  errStream.stream.listen((event) {
-    print('local => $event');
-  }).disposedBy(bag);
+  // var errStream = StreamController()..disposedBy(bag);
+  // errStream.stream.listen((event) {
+  //   print('local => $event');
+  // }).disposedBy(bag);
+  //
+  // actionBox((a) => a.valueConverter.getStringToCharValue).map().listen((v) {
+  //   print(v);
+  // }, onError: (error) {
+  //   print('onError => $error');
+  // });
+  //
+  // actionBox((a) => a.valueConverter.getStringToCharValue).go(
+  //     param: 'This is iterable stream test!',
+  //     errorSinks: (global, pipeline) => [global, pipeline, errStream]);
 
-  actionBox((a) => a.valueConverter.getStringToCharValue).map().listen((v) {
-    print(v);
-  }, onError: (error) {
-    print('onError => $error');
+  // var receivePort = ReceivePort();
+  // SendPort _sendPort;
+  //
+  // var isolate = await Isolate.spawn(testIsolate, receivePort.sendPort);
+  //
+  // var _completer = Completer<SendPort>();
+  // receivePort.listen((message) {
+  //   if (message is SendPort) {
+  //     _sendPort = message;
+  //     _completer.complete(_sendPort);
+  //     // completer.complete(message);
+  //   } else {
+  //     // 수신
+  //     print('isolated: $message');
+  //   }
+  // });
+  //
+  //
+  // var port = await _completer.future;
+  // port.send('um oh ah ye!');
+
+
+  await Future.delayed(Duration(seconds: 10));
+  //call dispose method when completed
+
+  // port.send('kill');
+  //
+  // receivePort.close();
+  // isolate.kill();
+  bag.dispose();
+}
+
+
+void testIsolate(SendPort sendPort) async {
+
+  var receivePort = ReceivePort();
+  sendPort.send(receivePort.sendPort);
+
+  receivePort.listen((message) {
+    print(message);
   });
 
-  actionBox((a) => a.valueConverter.getStringToCharValue).go(
-      param: 'This is iterable stream test!',
-      errorSinks: (global, pipeline) => [global, pipeline, errStream]);
 
   var file = File('/Users/yookjy/yookjy/Downloads/test.json');
   // file.openRead().transform(utf8.decoder).listen((event) { })
@@ -97,15 +166,15 @@ void main() async {
   await ioSink.flush();
 
   file.openRead()
-    .transform(utf8.decoder)
-    .transform(LineSplitter())
-    .listen((event) {
-      print(event);
+      .transform(utf8.decoder)
+      .transform(LineSplitter())
+      .listen((data) {
+    var index = json.decode(data);
+    if (index is Map)
+      print(index);
+    sendPort.send(index);
   });
 
+  print(Directory.current);
 
-
-  await Future.delayed(Duration(seconds: 10));
-  //call dispose method when completed
-  bag.dispose();
 }

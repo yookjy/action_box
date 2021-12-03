@@ -1,5 +1,9 @@
-class CacheStrategy {
-  final DateTime expire;
+import 'package:action_box/src/cache/cache_storage.dart';
 
-  const CacheStrategy({required this.expire});
+class CacheStrategy {
+  final Duration expire;
+
+  final Type cacheStorageType;
+
+  const CacheStrategy({required this.expire, required this.cacheStorageType});
 }
