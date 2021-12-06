@@ -3,8 +3,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
-import 'package:action_box/action_box.dart';
 import 'package:action_box/src/cache/cache_strategy.dart';
+import 'package:action_box/src/core/action.dart';
+import 'package:action_box/src/utils/disposable.dart';
+import 'package:action_box/src/utils/dispose_bag.dart';
+import 'package:action_box/src/utils/tuple.dart';
+import 'package:action_box/src/utils/uuid.dart';
 
 import 'cache_storage.dart';
 
@@ -51,15 +55,14 @@ class _FileCache extends FileCache {
     }
   }
 
-
   @override
-  FutureOr<Stream<TResult>>? readCache<TParam, TResult>(String id, CacheStrategy strategy,  [TParam? param]) {
-    if (_indexMap == null || !_indexMap!.containsKey(id)) {
+  FutureOr<Stream<TResult>>? readCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy strategy,  [TParam? param]) {
+    if (_indexMap == null || !_indexMap!.containsKey(action.defaultChannel.id)) {
       return null;
     }
 
-    var section = _indexMap![id];
-    var index = section['param@${json.encode(param)}'];
+    var section = _indexMap![action.defaultChannel.id];
+    var index = section[json.encode(param)];
     var expire = DateTime.parse(index['expire']);
     var cacheFileId = index['cache_id'];
 
@@ -73,7 +76,7 @@ class _FileCache extends FileCache {
       .transform(utf8.decoder)
       .listen((data) {
         var controller = StreamController<TResult>();
-        dynamic cache = json.decode(data);
+        var cache = json.decode(data, reviver: action.resultReviver);
         completer.complete(controller.stream);
         controller.sink.add(cache);
     });
@@ -81,29 +84,64 @@ class _FileCache extends FileCache {
   }
 
   @override
-  FutureOr writeCache<TParam, TResult>(String id, CacheStrategy strategy, TResult data, [TParam? param]) async {
+  FutureOr writeCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy strategy, TResult data, [TParam? param]) async {
     _indexMap ??= {};
 
     var cacheFileId = UUID.v4();
-    _indexMap![id] = {
+    _indexMap![action.defaultChannel.id] = {
       // if param is empty?
-      'param@${json.encode(param)}' : {
+      json.encode(param) : {
         'expire' : DateTime.now().add(strategy.expire).toIso8601String(),
         'cache_id' : cacheFileId
       }
     };
 
-    var sendPort = await _sendPortCompleter.future;
+    //var sendPort = await _sendPortCompleter.future;
+    //sendPort.send(Tuple3<String, String, dynamic>('write_index', path, _indexMap));
+    // sendPort.send(Tuple3<String, String, dynamic>('write_cache', path,
+    //     {
+    //       'id' : cacheFileId,
+    //       'data' : jsonEncode(data, toEncodable: action.resultToJson)
+    //     }));
 
-    sendPort.send(Tuple3<String, String, dynamic>('write_index', path, _indexMap));
-    sendPort.send(Tuple3<String, String, dynamic>('write_cache', path,
-        {
-          'id' : cacheFileId,
-          'data' : json.encode(data)
-        }));
+    Isolate? isolate;
+    var exit = ReceivePort();
+    exit.listen((message) {
+      isolate?.kill();
+    });
 
-
+    isolate = await Isolate.spawn(_writeCacheFile, Messenger({
+      'path': path,
+      'index_map': _indexMap,
+      // 'cache_index_id': action.defaultChannel.id,
+      // 'param': json.encode(param),
+      // 'expire': DateTime.now().add(strategy.expire).toIso8601String(),
+      'cache_file_id': cacheFileId,
+      'data': jsonEncode(data, toEncodable: action.resultToJson)
+    }/*, () {
+      isolate?.kill();
+    }*/), onExit: exit.sendPort);
   }
+
+  static void _writeCacheFile(Messenger messenger) async {
+    var index = messenger.parameters['index_map'];
+    var path = messenger.parameters['path'];
+    var cacheFileId = index['cache_file_id'];
+    await _writeFile(
+      path,
+      'ab_cache_index.json',
+      index);
+
+    await _writeFile(
+      path,
+      '$cacheFileId.json',
+      messenger.parameters['data']
+    );
+
+   // msg.completed();
+  }
+
+
 
   @override
   Type get runtimeType => FileCache;
@@ -204,12 +242,61 @@ class _FileCache extends FileCache {
     return completer.future;
   }
 
-  static void _writeFile(String path, String fileName, dynamic data) async {
+  static Future _writeFile(String path, String fileName, dynamic data) async {
     var file = _getFile(path, fileName);
     var sink = file.openWrite();
-    sink.write(json.encode(data));
+    sink.write(data);
     await sink.flush();
-    await sink.close();
+    return await sink.close();
   }
 
+}
+
+class TwoWayPort extends SendPort implements Disposable {
+
+  final SendPort sendPort;
+
+  final ReceivePort _receivePort = ReceivePort();
+
+  SendPort get receivePort => _receivePort.sendPort;
+
+  TwoWayPort(this.sendPort);
+
+  @override
+  void send(Object? message) {
+    sendPort.send(message);
+  }
+
+  @override
+  FutureOr dispose() {
+    _receivePort.close();
+  }
+}
+
+class Messenger extends Disposable {
+
+  final DisposeBag _disposeBag = DisposeBag();
+
+  final StreamController _streamController = StreamController();
+
+  final Map<String, dynamic> parameters;
+
+  Messenger(this.parameters/*, this.completed*/) {
+    _streamController.disposedBy(_disposeBag);
+
+  }
+
+  @override
+  FutureOr dispose() {
+    _disposeBag.dispose();
+  }
+
+}
+
+class Message {
+  //final Function() completed;
+
+  final Map<String, dynamic> parameters;
+
+  Message(this.parameters/*, this.completed*/);
 }

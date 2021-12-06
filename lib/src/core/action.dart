@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:action_box/action_box.dart';
 import 'package:action_box/src/core/channel.dart';
@@ -19,6 +20,14 @@ abstract class Action<TParam, TResult> implements Disposable {
   TransformedResult<TResult>? transform(Object error) {
     return null;
   }
+
+  Object? Function(Object? key, Object? value)? get paramReviver => null;
+
+  Object? Function(Object? object)? get paramToJson => null;
+
+  Object? Function(Object? key, Object? value)? get resultReviver => null;
+
+  Object? Function(Object? object)? get resultToJson => null;
 
   @override
   FutureOr dispose() {

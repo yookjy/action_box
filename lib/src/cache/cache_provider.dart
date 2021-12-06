@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:action_box/src/cache/cache_storage.dart';
 import 'package:action_box/src/cache/cache_strategy.dart';
+import 'package:action_box/src/core/action.dart';
 
 class CacheProvider extends CacheStorage {
 
@@ -10,21 +11,21 @@ class CacheProvider extends CacheStorage {
   CacheProvider(this._storages);
 
   @override
-  FutureOr<Stream<TResult>>? readCache<TParam, TResult>(String id, CacheStrategy strategy, [TParam? param]) {
-    return _getStorage(strategy)?.readCache(id, strategy, param);
+  FutureOr<Stream<TResult>>? readCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy strategy, [TParam? param]) {
+    return _getStorage(strategy)?.readCache(action, strategy, param);
   }
 
   @override
-  void writeCache<TParam, TResult>(String id, CacheStrategy? strategy, TResult data, [TParam? param]) {
+  void writeCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy? strategy, TResult data, [TParam? param]) {
     if (strategy != null) {
-      _getStorage(strategy)?.writeCache(id, strategy, data, param);
+      _getStorage(strategy)?.writeCache(action, strategy, data, param);
     }
   }
 
-  FutureOr<Stream<TResult>> readCacheIfAbsent<TParam, TResult>(String id, CacheStrategy? strategy, FutureOr<Stream<TResult>> Function([TParam? param]) ifAbsent, [TParam? param]) {
+  FutureOr<Stream<TResult>> readCacheIfAbsent<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy? strategy, [TParam? param]) {
     FutureOr<Stream<TResult>>? result;
-    if (strategy == null || (result = readCache<TParam, TResult>(id, strategy, param)) ==  null) {
-      return ifAbsent(param);
+    if (strategy == null || (result = readCache<TParam, TResult>(action, strategy, param)) ==  null) {
+      return action.process(param);
     }
     return result!;
   }

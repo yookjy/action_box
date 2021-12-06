@@ -23,4 +23,12 @@ class StringToList extends Action<String, List<String>?> {
   // TransformedResult<List<String>?> transform(Object error) {
   //   return TransformedResult(['t', 'r', 'a', 'n', 's', 'f', 'o', 'r', 'm']);
   // }
+
+  @override
+  Object? Function(Object? p1, Object? p2) get resultReviver => (Object? key, Object? value) {
+    if (value is List) {
+      return value.cast<String>().toList();
+    }
+    return value;
+  };
 }

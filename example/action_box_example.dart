@@ -58,7 +58,7 @@ void main() async {
   actionBox((a) => a.valueConverter.getStringToListValue).go(
       channel: (c) => c.ch1,
       param: 'value',
-      cacheStrategy: CacheStrategy(expire: Duration(minutes: 5), cacheStorageType: FileCache),
+      cacheStrategy: CacheStrategy(expire: const Duration(minutes: 5), cacheStorageType: FileCache),
       begin: () {/* before dispatching */},
       end: (success) {/* after dispatching */},
       timeout: Duration(seconds: 10));
@@ -68,7 +68,7 @@ void main() async {
   actionBox((a) => a.valueConverter.getStringToListValue).go(
       channel: (c) => c.ch1,
       param: 'value',
-      cacheStrategy: CacheStrategy(expire: Duration(seconds: 2), cacheStorageType: FileCache),
+      cacheStrategy: CacheStrategy(expire: const Duration(seconds: 2), cacheStorageType: FileCache),
       begin: () {/* before dispatching */},
       end: (success) {/* after dispatching */},
       timeout: Duration(seconds: 10));
@@ -78,7 +78,7 @@ void main() async {
   actionBox((a) => a.valueConverter.getStringToListValue).go(
       channel: (c) => c.ch1,
       param: 'value',
-      cacheStrategy: CacheStrategy(expire: Duration(seconds: 2), cacheStorageType: FileCache),
+      cacheStrategy: CacheStrategy(expire: const Duration(seconds: 2), cacheStorageType: FileCache),
       begin: () {/* before dispatching */},
       end: (success) {/* after dispatching */},
       timeout: Duration(seconds: 10));

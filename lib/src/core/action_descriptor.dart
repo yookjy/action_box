@@ -117,13 +117,13 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
       final channel$ = _getChannel(channel);
 
       // Emit the executed result of the action to the selected channel.
-      temporalSubscription = (result ?? await _cacheProvider.readCacheIfAbsent(_action.defaultChannel.id, cacheStrategy, _action.process, param))
+      temporalSubscription = (result ?? await _cacheProvider.readCacheIfAbsent(_action, cacheStrategy, param))
       // temporalSubscription = (result ?? await  _action.process(param))
           .timeout(timeout ?? _timeout)
           .transform<Tuple2<Channel, TResult?>>(
               StreamTransformer.fromHandlers(handleData: (data, sink) {
             sink.add(Tuple2(channel$, data));
-            _cacheProvider.writeCache(_action.defaultChannel.id, cacheStrategy, data, param);
+            _cacheProvider.writeCache(_action, cacheStrategy, data, param);
           }, handleError: (error, stackTrace, sink) {
             final transformedResult = _action.transform(error);
             if (transformedResult != null) {
