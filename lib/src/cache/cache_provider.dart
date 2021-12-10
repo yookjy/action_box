@@ -11,23 +11,19 @@ class CacheProvider extends CacheStorage {
   CacheProvider(this._storages);
 
   @override
-  FutureOr<Stream<TResult>>? readCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy strategy, [TParam? param]) {
-    return _getStorage(strategy)?.readCache(action, strategy, param);
+  FutureOr<Stream<TResult>> readCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy? strategy, TParam? param) {
+    CacheStorage? storage;
+    if (strategy == null || (storage = _getStorage(strategy)) == null) {
+      return action.process(param);
+    }
+    return storage!.readCache(action, strategy, param);
   }
 
   @override
-  void writeCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy? strategy, TResult data, [TParam? param]) {
+  void writeCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy? strategy, TResult data, TParam? param) {
     if (strategy != null) {
       _getStorage(strategy)?.writeCache(action, strategy, data, param);
     }
-  }
-
-  FutureOr<Stream<TResult>> readCacheIfAbsent<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy? strategy, [TParam? param]) {
-    FutureOr<Stream<TResult>>? result;
-    if (strategy == null || (result = readCache<TParam, TResult>(action, strategy, param)) ==  null) {
-      return action.process(param);
-    }
-    return result!;
   }
 
   CacheStorage? _getStorage(CacheStrategy strategy) =>

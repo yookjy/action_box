@@ -3,12 +3,12 @@ import 'package:action_box/src/utils/uuid.dart';
 class Channel {
   String get id => _ids[0];
 
-  late final List<String> _ids;
+  final List<String> _ids;
   List<String> get ids => _ids;
 
-  Channel() {
-    _ids = [UUID.v4()];
-  }
+  Channel() : _ids = [UUID.v4()];
+
+  // Channel({String? uuid}) : _ids = [uuid ?? UUID.v4()];
 
   Channel._from(this._ids);
 

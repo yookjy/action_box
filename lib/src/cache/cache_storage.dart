@@ -7,9 +7,9 @@ abstract class CacheStorage {
 
   const CacheStorage();
 
-  void writeCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy strategy, TResult data, [TParam? param]);
+  void writeCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy strategy, TResult data, TParam? param);
 
-  FutureOr<Stream<TResult>>? readCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy strategy, [TParam? param]);
+  FutureOr<Stream<TResult>> readCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy strategy, TParam? param);
 
   void clear();
 }

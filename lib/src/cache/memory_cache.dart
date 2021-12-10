@@ -16,10 +16,10 @@ class _MemoryCache extends MemoryCache {
   final _cacheTable = <String, Map<String, Map<String, dynamic>>>{};
 
   @override
-  FutureOr<Stream<TResult>>? readCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy strategy, [TParam? param]) {
+  FutureOr<Stream<TResult>> readCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy strategy, TParam? param) {
     if (_cacheTable.isNotEmpty && _cacheTable.containsKey(action.defaultChannel.id)) {
       var cache = _cacheTable[action.defaultChannel.id];
-      var sectionKey = 'param@${json.encode(param)}';
+      var sectionKey = 'param@${action.serializeParameter(param)}';
       var section = cache?[sectionKey];
       if (section != null) {
         var expire = (section['expire'] as DateTime).compareTo(DateTime.now());
@@ -31,22 +31,23 @@ class _MemoryCache extends MemoryCache {
         }
       }
     }
-    return null;
+    return action.process(param);
   }
 
   @override
   Type get runtimeType => MemoryCache;
 
   @override
-  void writeCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy strategy, TResult data, [TParam? param]) {
+  void writeCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy strategy, TResult data, TParam? param) {
     try {
       _cacheTable[action.defaultChannel.id] = {
-        'param@${json.encode(param)}' : {
-          'expire' : DateTime.now().add(strategy.expire),
-          'data' : data
+        'param@${action.serializeParameter(param)}': {
+          'expire': DateTime.now().add(strategy.expire),
+          'data': data
         }
       };
     } catch(e) {
+      //ignore
       print(e);
     }
   }

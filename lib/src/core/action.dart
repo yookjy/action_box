@@ -21,13 +21,29 @@ abstract class Action<TParam, TResult> implements Disposable {
     return null;
   }
 
-  Object? Function(Object? key, Object? value)? get paramReviver => null;
+  String serializeParameter(TParam? param) {
+    try {
+      return json.encode(param);
+    } catch(error) {
+      throw Exception('The "serializeParameters(TParam param)" method must be overridden.');
+    }
+  }
 
-  Object? Function(Object? object)? get paramToJson => null;
+  String serializeResult(TResult result) {
+    try {
+      return json.encode(result);
+    } catch(error) {
+      throw Exception('The "serializeResult(TResult result)" method must be overridden.');
+    }
+  }
 
-  Object? Function(Object? key, Object? value)? get resultReviver => null;
-
-  Object? Function(Object? object)? get resultToJson => null;
+  TResult deserializeResult(String source) {
+    try {
+      return json.decode(source);
+    } catch(error) {
+      throw Exception('The "deserializeResult(String source)" method must be overridden.');
+    }
+  }
 
   @override
   FutureOr dispose() {

@@ -5,14 +5,11 @@ import 'dart:isolate';
 
 import 'package:action_box/src/cache/cache_strategy.dart';
 import 'package:action_box/src/core/action.dart';
-import 'package:action_box/src/utils/disposable.dart';
-import 'package:action_box/src/utils/dispose_bag.dart';
-import 'package:action_box/src/utils/tuple.dart';
 import 'package:action_box/src/utils/uuid.dart';
 
 import 'cache_storage.dart';
 
-abstract class FileCache extends CacheStorage implements Disposable {
+abstract class FileCache extends CacheStorage {
   const FileCache();
 
   factory FileCache.fromPath(String path) => _FileCache(path);
@@ -20,200 +17,246 @@ abstract class FileCache extends CacheStorage implements Disposable {
 
 class _FileCache extends FileCache {
 
+  final Map<String, dynamic> _indexMap = {};
   final String path;
 
-  Isolate? _isolate;
-  final _receivePort = ReceivePort();
-  final _sendPortCompleter = Completer<SendPort>();
-  SendPort? _sendPort;
+  _FileCache(this.path) : assert(path.isNotEmpty);
+  
+  String _getCachePath(String directory) => _concatPath(_getLocalCacheDir(path), directory);
 
-  _FileCache(this.path) : assert(path.isNotEmpty) {
-    _initIsolate();
-  }
+  Future<Map?> _readIndex<TParam, TResult>(Action<TParam, TResult> action, covariant FileCacheStrategy strategy,  TParam? param) async {
+    var completer = Completer<Map?>();
+    var paramKey = 'pk@${action.serializeParameter(param)}';
 
-  void _initIsolate() async {
-    _receivePort.listen((message) async {
-      if (message is SendPort)  {
-        //_sendPortCompleter.complete(message);
-        _sendPort = message;
-        _sendPortCompleter.complete(_sendPort);
-        message.send(Tuple3<String, String, dynamic>('read_index', path, null));
-      } else {
-        // 수신
-        _callBackProcessIO(message);
-      }
-    });
+    // 메모리에 인덱스가 존재하지 않거나 파람키가 존재하지 않거나 만료되었으면, 인덱스 로드
+    if (!_indexMap.containsKey(strategy.key) || !_indexMap[strategy.key].containsKey(paramKey)) {
+      var receivePort = ReceivePort();
+      Isolate? isolate;
+      StreamSubscription? subscription;
 
-    _isolate = await Isolate.spawn(processFileIO, _receivePort.sendPort);
-  }
+      subscription = receivePort.listen((message) {
+        if (message == null) {
+          completer.complete(null);
+        } else {
+          Map cache = json.decode(message);
+          var index = cache[paramKey];
+          var expire = DateTime.parse(index['expire']);
 
-  void _callBackProcessIO(Tuple2<String, dynamic> message) {
-    switch(message.item1) {
-      case 'index_map':
-        _indexMap = message.item2;
-        break;
+          if (expire.compareTo(DateTime.now()) < 0) {
+            // 캐시가 만료 되었으므로 삭제 하고 중단.
+            cache.remove(paramKey);
+            deleteCache(strategy.key, cache, index['cache_file_name']);
+            completer.complete(null);
+          } else {
+            // 메모리에 캐시 내용 저장
+            _indexMap.putIfAbsent(strategy.key, () => cache);
+            completer.complete(index);
+          }
+        }
+        receivePort.close();
+        subscription?.cancel();
+        isolate?.kill();
+      });
+
+      isolate = await Isolate.spawn(_readIndexFile, Messenger({
+        'path': _getCachePath(strategy.key),
+      }, receivePort.sendPort));
+    } else {
+      var cache = _indexMap[strategy.key];
+      var index = cache[paramKey];
+      completer.complete(index);
     }
-  }
 
-  @override
-  FutureOr<Stream<TResult>>? readCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy strategy,  [TParam? param]) {
-    if (_indexMap == null || !_indexMap!.containsKey(action.defaultChannel.id)) {
-      return null;
-    }
-
-    var section = _indexMap![action.defaultChannel.id];
-    var index = section[json.encode(param)];
-    var expire = DateTime.parse(index['expire']);
-    var cacheFileId = index['cache_id'];
-
-    if (expire.compareTo(DateTime.now()) < 0) {
-      return null;
-    }
-
-    var completer = Completer<Stream<TResult>>();
-    var file = _getFile(path, '$cacheFileId.json');
-    file.openRead()
-      .transform(utf8.decoder)
-      .listen((data) {
-        var controller = StreamController<TResult>();
-        var cache = json.decode(data, reviver: action.resultReviver);
-        completer.complete(controller.stream);
-        controller.sink.add(cache);
-    });
     return completer.future;
   }
 
   @override
-  FutureOr writeCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy strategy, TResult data, [TParam? param]) async {
-    _indexMap ??= {};
+  FutureOr<Stream<TResult>> readCache<TParam, TResult>(Action<TParam, TResult> action, covariant FileCacheStrategy strategy, TParam? param) async {
+    var index = await _readIndex(action, strategy, param);
+    print('인덱스: $index');
+    TResult? data;
+    if (index != null && (data = await _readCacheData(action, strategy, index['cache_file_name'])) != null){
+      return Stream.value(data!);
+    }
+    return action.process(param);
+  }
 
-    var cacheFileId = UUID.v4();
-    _indexMap![action.defaultChannel.id] = {
-      // if param is empty?
-      json.encode(param) : {
-        'expire' : DateTime.now().add(strategy.expire).toIso8601String(),
-        'cache_id' : cacheFileId
-      }
-    };
+  Future<TResult?> _readCacheData<TParam, TResult>(Action<TParam, TResult> action, FileCacheStrategy strategy, String cacheFileName) async {
+    Isolate? isolate;
+    StreamSubscription? subscription;
+    var receivePort = ReceivePort();
+    var completer = Completer<TResult?>();
 
-    //var sendPort = await _sendPortCompleter.future;
-    //sendPort.send(Tuple3<String, String, dynamic>('write_index', path, _indexMap));
-    // sendPort.send(Tuple3<String, String, dynamic>('write_cache', path,
-    //     {
-    //       'id' : cacheFileId,
-    //       'data' : jsonEncode(data, toEncodable: action.resultToJson)
-    //     }));
+    subscription = receivePort.listen((message) {
+      var result = action.deserializeResult(message);
+      completer.complete(result);
+
+      receivePort.close();
+      subscription?.cancel();
+      isolate?.kill();
+    });
+
+    isolate = await Isolate.spawn(_readCacheFile, Messenger({
+      'path': _getCachePath(strategy.key),
+      'cache_file_name': cacheFileName,
+    }, receivePort.sendPort));
+
+    return completer.future;
+  }
+
+  @override
+  FutureOr writeCache<TParam, TResult>(Action<TParam, TResult> action, covariant FileCacheStrategy strategy, TResult data, [TParam? param]) async {
 
     Isolate? isolate;
-    var exit = ReceivePort();
-    exit.listen((message) {
+    StreamSubscription? subscription;
+    var receivePort = ReceivePort();
+    Map index = _indexMap.putIfAbsent(strategy.key, () => {});
+
+    var paramKey = 'pk@${action.serializeParameter(param)}';
+    var paramKeySection = index.putIfAbsent(paramKey, () => {});
+    var iso8601 = paramKeySection['expire'];
+
+    if (iso8601 != null) {
+      if (DateTime.parse(iso8601).compareTo(DateTime.now()) < 0) {
+        //만료된 캐시 및 인덱스 제거
+        index.remove(paramKey);
+        deleteCache(strategy.key, index, paramKeySection['cache_file_name']);
+      } else {
+        //캐시가 유효하므로 스킵
+        return;
+      }
+    }
+
+    var cacheFileName = UUID.v4();
+    index[paramKey] = paramKeySection;
+    paramKeySection['expire'] = DateTime.now().add(strategy.expire).toIso8601String();
+    paramKeySection['cache_file_name'] = cacheFileName;
+
+    subscription = receivePort.listen((message) {
+      receivePort.close();
+      subscription?.cancel();
       isolate?.kill();
     });
 
     isolate = await Isolate.spawn(_writeCacheFile, Messenger({
-      'path': path,
-      'index_map': _indexMap,
-      // 'cache_index_id': action.defaultChannel.id,
-      // 'param': json.encode(param),
-      // 'expire': DateTime.now().add(strategy.expire).toIso8601String(),
-      'cache_file_id': cacheFileId,
-      'data': jsonEncode(data, toEncodable: action.resultToJson)
-    }/*, () {
+      'path': _getCachePath(strategy.key),
+      'index': json.encode(index),
+      'cache_file_name': cacheFileName,
+      'data': action.serializeResult(data)
+    }, receivePort.sendPort));
+  }
+
+  void deleteCache(String strategyKey, Map index, String cacheFileName) async {
+    Isolate? isolate;
+    StreamSubscription? subscription;
+    var receivePort = ReceivePort();
+
+    subscription = receivePort.listen((message) {
+      receivePort.close();
+      subscription?.cancel();
       isolate?.kill();
-    }*/), onExit: exit.sendPort);
+    });
+
+    isolate = await Isolate.spawn(_deleteCacheFile, Messenger({
+      'path': _getCachePath(strategyKey),
+      'index': index.isEmpty ? null : json.encode(index),
+      'cache_file_name': cacheFileName,
+    }, receivePort.sendPort));
   }
 
   static void _writeCacheFile(Messenger messenger) async {
-    var index = messenger.parameters['index_map'];
     var path = messenger.parameters['path'];
-    var cacheFileId = index['cache_file_id'];
-    await _writeFile(
-      path,
-      'ab_cache_index.json',
-      index);
+    var index = messenger.parameters['index'];
+    var fileName = messenger.parameters['cache_file_name'];
+    var data = messenger.parameters['data'];
 
-    await _writeFile(
-      path,
-      '$cacheFileId.json',
-      messenger.parameters['data']
-    );
-
-   // msg.completed();
+    var success = false;
+    try {
+      print('인덱스 쓰기 : $index');
+      await _writeFile(path, 'index', index);
+      await _writeFile(path, '$fileName', data);
+      success = true;
+    } catch(error) {
+      //ignore
+      print(error);
+    }
+    messenger.sendPort.send(success);
   }
 
+  static void _readIndexFile(Messenger messenger) async {
+    var path = messenger.parameters['path'];
 
+    await _readFile(path, 'index').then((value) {
+      print('인덱스 읽기 성공: $value');
+      messenger.sendPort.send(value);
+    }, onError: (error, stackTrace) {
+      print('인덱스 읽기 실패');
+      messenger.sendPort.send(null);
+    });
+  }
+
+  static void _readCacheFile(Messenger messenger) async {
+    var path = messenger.parameters['path'];
+    var fileName = messenger.parameters['cache_file_name'];
+
+    await _readFile(path, fileName).then((value) {
+      print('캐시 읽기 성공: $value');
+      messenger.sendPort.send(value);
+    }, onError: (error, stackTrace) {
+      print('캐시 읽기 실패');
+      messenger.sendPort.send(null);
+    });
+  }
+
+  static void _deleteCacheFile(Messenger messenger) async {
+    var path = messenger.parameters['path'];
+    var index = messenger.parameters['index'];
+    var fileName = messenger.parameters['cache_file_name'];
+
+    var success = false;
+    try {
+      if (index == null) {
+        print('인덱스 삭제');
+        await _deleteFile(path, 'index');
+      } else {
+        print('(삭제요청)인덱스 덮어 쓰기 : $index');
+        await _writeFile(path, 'index', index);
+      }
+      await _deleteFile(path, fileName);
+      success = true;
+    } catch(error) {
+      //ignore
+      print(error);
+    }
+    messenger.sendPort.send(success);
+  }
 
   @override
   Type get runtimeType => FileCache;
 
   @override
-  FutureOr dispose() {
-    _receivePort.close();
-    _isolate?.kill();
-  }
-
-  @override
   void clear() {
-    //TODO: implements
+    var path = _getLocalCacheDir(this.path);
+    var directory = Directory(path);
+    if (directory.existsSync()) {
+      directory.delete(recursive: true);
+    }
   }
-
-  /*
-  File structure
-    <ab_cache_index.json - index file>
-    file_name : <uuid>.json
-      <uuid - action's default channel id> : {
-        parameter(web url format) : {
-          expire: 2021-12-31 23:59:59,
-          cache_id: <uuid - in data directory>
-        },
-        parameter(web url format) : {
-          expire: 2021-12-31 23:59:59,
-          cache_id: <uuid - in data directory>
-        },
-        ...
-      }
-
-   */
-
-
-  static void processFileIO(SendPort to) {
-    final indexFileName = 'ab_cache_index.json';
-    var from = ReceivePort();
-    to.send(from.sendPort);
-
-    from.listen((message) async {
-      var tuple = message as Tuple3<String, String, dynamic>;
-      switch(tuple.item1) {
-        case 'read_index':
-          var indexMap = await _readFile(tuple.item2, indexFileName);
-          to.send(Tuple2('index_map', indexMap));
-          break;
-        case 'read_cache':
-          break;
-        case 'write_index':
-         _writeFile(tuple.item2, indexFileName, tuple.item3);
-          break;
-        case 'write_cache':
-         _writeFile(tuple.item2, '${tuple.item3['id']}.json', tuple.item3['data']);
-          break;
-        case 'kill':
-          from.close();
-          break;
-      }
-    });
-  }
-
 
   static File _getFile(String path, String fileName) {
-    var indexFilePath = _getFilePath(path, fileName);
-    var indexFile = File(indexFilePath);
-    if (!indexFile.existsSync()) {
-      indexFile.createSync();
+    var filePath = _concatPath(path, fileName);
+    var file = File(filePath);
+    if (!file.existsSync()) {
+      file.createSync();
     }
-    return indexFile;
+    return file;
   }
 
-  static String _getFilePath(String path, String fileName) {
+  static String _getLocalCacheDir(String path, [String? path2]) {
+    return _concatPath(path, 'local_cache/');
+  }
+
+  static String _concatPath(String path, String path2) {
     var filePath = path;
     var separator = filePath.substring(filePath.length - 1, filePath.length);
 
@@ -221,82 +264,60 @@ class _FileCache extends FileCache {
       filePath += '/';
     }
 
-    return filePath + fileName;
+    return filePath + path2;
   }
 
-  Map<String, dynamic>? _indexMap;
+  static Future<String?> _readFile(String path, String fileName) async {
+    var completer = Completer<String?>();
 
-  static Future<Map<String, dynamic>> _readFile(String path, String fileName) {
-    var completer = Completer<Map<String, dynamic>>();
-    var file = _getFile(path, fileName);
-    file.openRead()
-      .transform(utf8.decoder)
-      .listen((data) {
-        var indexJson = json.decode(data);
-        if (indexJson is Map<String, dynamic>) {
-          //_indexMap = indexJson;
-          completer.complete(indexJson);
+    var cacheDir = Directory(path);
+    if (!await cacheDir.exists()) {
+      cacheDir = await cacheDir.create(recursive: true);
+    }
+
+    var file = _getFile(cacheDir.path, '$fileName.json');
+    if (file.lengthSync() == 0) {
+      completer.complete(null);
+    } else {
+      file.openRead()
+        .transform(utf8.decoder)
+        .listen((data) {
+          completer.complete(data);
+        }, onError: (error, stackTrace) {
+          completer.completeError(error, stackTrace);
         }
-      }
-    );
+      );
+    }
     return completer.future;
   }
 
   static Future _writeFile(String path, String fileName, dynamic data) async {
-    var file = _getFile(path, fileName);
+    var cacheDir = Directory(path);
+    if (!await cacheDir.exists()) {
+      cacheDir = await cacheDir.create(recursive: true);
+    }
+
+    var file = _getFile(cacheDir.path, '$fileName.json');
     var sink = file.openWrite();
     sink.write(data);
     await sink.flush();
     return await sink.close();
   }
 
+  static Future _deleteFile(String path, String fileName) async {
+    var filePath = _concatPath(path, '$fileName.json');
+    var file = File(filePath);
+    if (await file.exists()) {
+      return file.delete();
+    }
+  }
 }
 
-class TwoWayPort extends SendPort implements Disposable {
+class Messenger {
 
   final SendPort sendPort;
 
-  final ReceivePort _receivePort = ReceivePort();
-
-  SendPort get receivePort => _receivePort.sendPort;
-
-  TwoWayPort(this.sendPort);
-
-  @override
-  void send(Object? message) {
-    sendPort.send(message);
-  }
-
-  @override
-  FutureOr dispose() {
-    _receivePort.close();
-  }
-}
-
-class Messenger extends Disposable {
-
-  final DisposeBag _disposeBag = DisposeBag();
-
-  final StreamController _streamController = StreamController();
-
   final Map<String, dynamic> parameters;
 
-  Messenger(this.parameters/*, this.completed*/) {
-    _streamController.disposedBy(_disposeBag);
-
-  }
-
-  @override
-  FutureOr dispose() {
-    _disposeBag.dispose();
-  }
-
-}
-
-class Message {
-  //final Function() completed;
-
-  final Map<String, dynamic> parameters;
-
-  Message(this.parameters/*, this.completed*/);
+  Messenger(this.parameters, this.sendPort);
 }

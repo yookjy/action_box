@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:action_box/action_box.dart';
 
@@ -25,10 +26,14 @@ class StringToList extends Action<String, List<String>?> {
   // }
 
   @override
-  Object? Function(Object? p1, Object? p2) get resultReviver => (Object? key, Object? value) {
-    if (value is List) {
-      return value.cast<String>().toList();
-    }
-    return value;
-  };
+  List<String>? deserializeResult(String source) {
+    return json.decode(source, reviver: (k, v) {
+      if (v is List) {
+        return v.cast<String>().toList();
+      }
+      return v;
+    });
+  }
+
+
 }

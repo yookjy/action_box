@@ -117,7 +117,7 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
       final channel$ = _getChannel(channel);
 
       // Emit the executed result of the action to the selected channel.
-      temporalSubscription = (result ?? await _cacheProvider.readCacheIfAbsent(_action, cacheStrategy, param))
+      temporalSubscription = (result ?? await _cacheProvider.readCache(_action, cacheStrategy, param))
       // temporalSubscription = (result ?? await  _action.process(param))
           .timeout(timeout ?? _timeout)
           .transform<Tuple2<Channel, TResult?>>(
