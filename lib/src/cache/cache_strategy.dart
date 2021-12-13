@@ -15,6 +15,6 @@ class FileCacheStrategy extends CacheStrategy<FileCache> {
   FileCacheStrategy(this.key, {required Duration expire}) : super(expire: expire);
 }
 
-class MemCacheStrategy extends CacheStrategy<MemoryCache> {
-  MemCacheStrategy({required Duration expire}) : super(expire: expire);
+class MemoryCacheStrategy extends CacheStrategy<MemoryCache> {
+  MemoryCacheStrategy({required Duration expire}) : super(expire: expire);
 }

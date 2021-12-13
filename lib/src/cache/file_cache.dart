@@ -17,12 +17,13 @@ abstract class FileCache extends CacheStorage {
 
 class _FileCache extends FileCache {
 
+  static final _cacheDirectory = 'local_cache/';
+  static final _fileExt = '.json';
+
   final Map<String, dynamic> _indexMap = {};
   final String path;
 
   _FileCache(this.path) : assert(path.isNotEmpty);
-  
-  String _getCachePath(String directory) => _concatPath(_getLocalCacheDir(path), directory);
 
   Future<Map?> _readIndex<TParam, TResult>(Action<TParam, TResult> action, covariant FileCacheStrategy strategy,  TParam? param) async {
     var completer = Completer<Map?>();
@@ -72,7 +73,6 @@ class _FileCache extends FileCache {
   @override
   FutureOr<Stream<TResult>> readCache<TParam, TResult>(Action<TParam, TResult> action, covariant FileCacheStrategy strategy, TParam? param) async {
     var index = await _readIndex(action, strategy, param);
-    print('인덱스: $index');
     TResult? data;
     if (index != null && (data = await _readCacheData(action, strategy, index['cache_name'])) != null){
       return Stream.value(data!);
@@ -177,9 +177,10 @@ class _FileCache extends FileCache {
 
     var success = false;
     try {
-      print('인덱스 쓰기 : $indexData');
+      print('Saving cache to file. => $indexData');
       await _writeFile(path, indexName, indexData);
       await _writeFile(path, cacheName, cacheData);
+      print('Save completed.');
       success = true;
     } catch(error) {
       //ignore
@@ -193,23 +194,23 @@ class _FileCache extends FileCache {
     var indexName = messenger.parameters['index_name'];
 
     await _readFile(path, indexName).then((value) {
-      print('인덱스 읽기 성공: $value');
+      print('Read index file => $value');
       messenger.reply(value);
     }, onError: (error, stackTrace) {
-      print('인덱스 읽기 실패');
+      print('Unable to read index file.');
       messenger.reply(null);
     });
   }
 
   static void _readCacheFile(Messenger messenger) async {
     var path = messenger.parameters['path'];
-    var fileName = messenger.parameters['cache_name'];
+    var cacheName = messenger.parameters['cache_name'];
 
-    await _readFile(path, fileName).then((value) {
-      print('캐시 읽기 성공: $value');
+    await _readFile(path, cacheName).then((value) {
+      print('Read cache file => $value');
       messenger.reply(value);
     }, onError: (error, stackTrace) {
-      print('캐시 읽기 실패');
+      print('Unable to read cache file.');
       messenger.reply(null);
     });
   }
@@ -217,12 +218,12 @@ class _FileCache extends FileCache {
   static void _deleteCacheFile(Messenger messenger) async {
     var path = messenger.parameters['path'];
     var indexName = messenger.parameters['index_name'];
-    var fileName = messenger.parameters['cache_name'];
+    var cacheName = messenger.parameters['cache_name'];
 
     var success = false;
     try {
       await _deleteFile(path, indexName);
-      await _deleteFile(path, fileName);
+      await _deleteFile(path, cacheName);
       success = true;
     } catch(error) {
       //ignore
@@ -236,7 +237,7 @@ class _FileCache extends FileCache {
 
   @override
   void clear() {
-    var path = _getLocalCacheDir(this.path);
+    var path = _getCacheRoot(this.path);
     var directory = Directory(path);
     if (directory.existsSync()) {
       directory.delete(recursive: true);
@@ -252,9 +253,9 @@ class _FileCache extends FileCache {
     return file;
   }
 
-  static String _getLocalCacheDir(String path, [String? path2]) {
-    return _concatPath(path, 'local_cache/');
-  }
+  String _getCachePath(String directory) => _concatPath(_getCacheRoot(path), directory);
+
+  String _getCacheRoot(String path) => _concatPath(path, _cacheDirectory);
 
   static String _concatPath(String path, String path2) {
     var filePath = path;
@@ -275,7 +276,7 @@ class _FileCache extends FileCache {
       cacheDir = await cacheDir.create(recursive: true);
     }
 
-    var file = _getFile(cacheDir.path, '$fileName.json');
+    var file = _getFile(cacheDir.path, '$fileName$_fileExt');
     if (file.lengthSync() == 0) {
       completer.complete(null);
     } else {
@@ -297,7 +298,7 @@ class _FileCache extends FileCache {
       cacheDir = await cacheDir.create(recursive: true);
     }
 
-    var file = _getFile(cacheDir.path, '$fileName.json');
+    var file = _getFile(cacheDir.path, '$fileName$_fileExt');
     var sink = file.openWrite();
     sink.write(data);
     await sink.flush();
@@ -305,7 +306,7 @@ class _FileCache extends FileCache {
   }
 
   static FutureOr _deleteFile(String path, String fileName) async {
-    var filePath = _concatPath(path, '$fileName.json');
+    var filePath = _concatPath(path, '$fileName$_fileExt');
     var file = File(filePath);
     if (await file.exists()) {
       return file.delete();
