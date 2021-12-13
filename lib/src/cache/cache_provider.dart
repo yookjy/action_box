@@ -37,4 +37,11 @@ class CacheProvider extends CacheStorage {
       storage?.clear();
     });
   }
+
+  @override
+  FutureOr dispose() {
+    _storages.forEach((storage) {
+      storage?.dispose();
+    });
+  }
 }

@@ -2,8 +2,9 @@ import 'dart:async';
 
 import 'package:action_box/src/cache/cache_strategy.dart';
 import 'package:action_box/src/core/action.dart';
+import 'package:action_box/src/utils/disposable.dart';
 
-abstract class CacheStorage {
+abstract class CacheStorage implements Disposable {
 
   const CacheStorage();
 

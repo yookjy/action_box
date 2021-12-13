@@ -56,4 +56,11 @@ class _MemoryCache extends MemoryCache {
   void clear() {
     _cacheTable.clear();
   }
+
+  @override
+  FutureOr dispose() {
+    if (_cacheTable.isNotEmpty) {
+      clear();
+    }
+  }
 }

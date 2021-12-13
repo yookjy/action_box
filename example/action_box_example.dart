@@ -42,78 +42,69 @@ void main() async {
     result?.forEach((v) => print(v));
   }).disposedBy(bag);
   //
-  // actionBox((a) => a.valueConverter.getStringToListValue)
-  //     .map(channel: (a) => a.ch1 | a.defaultChannel)
-  //     .listen((result) {
-  //   result?.forEach((v) => print(v));
-  // }).disposedBy(bag);
-  //
-  // actionBox((a) => a.valueConverter.getStringToListValue)
-  //     .map(channel: (a) => a.ch1)
-  //     .listen((result) {
-  //   result?.forEach((v) => print(v));
-  // }).disposedBy(bag);
+  actionBox((a) => a.valueConverter.getStringToListValue)
+      .map(channel: (a) => a.ch1 | a.defaultChannel)
+      .listen((result) {
+    result?.forEach((v) => print(v));
+  }).disposedBy(bag);
+
+  actionBox((a) => a.valueConverter.getStringToListValue)
+      .map(channel: (a) => a.ch1)
+      .listen((result) {
+    result?.forEach((v) => print(v));
+  }).disposedBy(bag);
 
   //request data
   actionBox((a) => a.valueConverter.getStringToListValue).go(
       channel: (c) => c.ch1,
       param: 'value',
       cacheStrategy: FileCacheStrategy('test_key_0000', expire: const Duration(minutes: 5)),
+      // cacheStrategy: MemCacheStrategy(expire: const Duration(minutes: 5)),
       begin: () {/* before dispatching */},
       end: (success) {/* after dispatching */},
       timeout: Duration(seconds: 10));
 
-  // await Future.delayed(Duration(seconds: 1));
-  //
-  // actionBox((a) => a.valueConverter.getStringToListValue).go(
-  //     channel: (c) => c.ch1,
-  //     param: 'value',
-  //     cacheStrategy: FileCacheStrategy('test_key_0000', expire: const Duration(seconds: 2)),
-  //     begin: () {/* before dispatching */},
-  //     end: (success) {/* after dispatching */},
-  //     timeout: Duration(seconds: 10));
-  //
-  // await Future.delayed(Duration(seconds: 2));
-  //
-  // actionBox((a) => a.valueConverter.getStringToListValue).go(
-  //     channel: (c) => c.ch1,
-  //     param: 'value',
-  //     cacheStrategy: FileCacheStrategy('test_key_0000', expire: const Duration(seconds: 2)),
-  //     begin: () {/* before dispatching */},
-  //     end: (success) {/* after dispatching */},
-  //     timeout: Duration(seconds: 10));
+  await Future.delayed(Duration(seconds: 1));
 
-  // actionBox((a) => a.valueConverter.getStringToListValue)
-  //     .when(() => true, (a) => a.echo(value: ['e', 'c', 'h', 'o']))
-  //     .when(() => true, (a) => a.echo(value: null))
-  //     .when(() => true, (a) => a.drain(param: 'ignore'))
-  //     .go(param: 'real value');
-  //
-  // actionBox((a) => a.valueConverter.getStringToListValue).drain(
-  //     param: 'waste',
-  //     end: (success) {
-  //       print(success);
-  //     });
+  actionBox((a) => a.valueConverter.getStringToListValue).go(
+      channel: (c) => c.ch1,
+      param: 'value1',
+      cacheStrategy: FileCacheStrategy('test_key_0000', expire: const Duration(minutes: 2)),
+      begin: () {/* before dispatching */},
+      end: (success) {/* after dispatching */},
+      timeout: Duration(seconds: 10));
 
-  // var errStream = StreamController()..disposedBy(bag);
-  // errStream.stream.listen((event) {
-  //   print('local => $event');
-  // }).disposedBy(bag);
-  //
-  // actionBox((a) => a.valueConverter.getStringToCharValue).map().listen((v) {
-  //   print(v);
-  // }, onError: (error) {
-  //   print('onError => $error');
-  // });
-  //
-  // actionBox((a) => a.valueConverter.getStringToCharValue).go(
-  //     param: 'This is iterable stream test!',
-  //     errorSinks: (global, pipeline) => [global, pipeline, errStream]);
+  actionBox((a) => a.valueConverter.getStringToListValue)
+      .when(() => true, (a) => a.echo(value: ['e', 'c', 'h', 'o']))
+      .when(() => true, (a) => a.echo(value: null))
+      .when(() => true, (a) => a.drain(param: 'ignore'))
+      .go(param: 'real value');
 
+  actionBox((a) => a.valueConverter.getStringToListValue).drain(
+      param: 'waste',
+      end: (success) {
+        print(success);
+      });
 
-  await Future.delayed(Duration(seconds: 10));
+  var errStream = StreamController()..disposedBy(bag);
+  errStream.stream.listen((event) {
+    print('local => $event');
+  }).disposedBy(bag);
+
+  actionBox((a) => a.valueConverter.getStringToCharValue).map().listen((v) {
+    print(v);
+  }, onError: (error) {
+    print('onError => $error');
+  });
+
+  actionBox((a) => a.valueConverter.getStringToCharValue).go(
+      param: 'This is iterable stream test!',
+      errorSinks: (global, pipeline) => [global, pipeline, errStream]);
+
+  await Future.delayed(Duration(seconds: 5));
   //call dispose method when completed
 
   bag.dispose();
+  actionBox.dispose();
   print('종료됨');
 }

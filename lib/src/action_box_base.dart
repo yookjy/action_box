@@ -30,6 +30,7 @@ abstract class ActionBoxBase<TActionDirectory extends ActionDirectory> {
   void dispose() {
     _root.dispose();
     _errorStreamController.close();
+    _cacheProvider.dispose();
   }
 
   ActionExecutor<TParam, TResult, TAction>
