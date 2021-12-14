@@ -4,6 +4,10 @@
 library action_box;
 
 export 'src/action_box_base.dart';
+export 'src/cache/cache_storage.dart';
+export 'src/cache/cache_strategy.dart';
+export 'src/cache/file_cache.dart';
+export 'src/cache/memory_cache.dart';
 export 'src/core/action.dart';
 export 'src/core/action_descriptor.dart';
 export 'src/core/action_directory.dart';

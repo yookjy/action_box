@@ -18,9 +18,9 @@ class ActionBox extends ActionBoxBase<_ActionRoot> {
   factory ActionBox.shared(
           {StreamController<dynamic> Function()? errorStreamFactory,
           Duration? defaultTimeout,
-          List<CacheStorage>? cacheStorageProviders}) =>
+          List<CacheStorage>? cacheStorages}) =>
       _instance ??= ActionBox._(
-          errorStreamFactory, defaultTimeout, cacheStorageProviders);
+          errorStreamFactory, defaultTimeout, cacheStorages);
 
   @override
   void dispose() {

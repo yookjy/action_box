@@ -4,9 +4,6 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:action_box/action_box.dart';
-import 'package:action_box/src/cache/cache_strategy.dart';
-import 'package:action_box/src/cache/file_cache.dart';
-import 'package:action_box/src/cache/memory_cache.dart';
 // import 'package:rxdart/rxdart.dart';
 
 import 'action_box.dart';
@@ -26,7 +23,7 @@ final actionBox = ActionBox.shared(
     //   .where((x) => x.isNotEmpty)
     //   .flatMap((x) =>
     //   (x as PublishSubject<Object>).distinct((pre, cur) => pre == cur))
-    cacheStorageProviders: [
+    cacheStorages: [
       MemoryCache.create(),
       FileCache.fromPath(Directory.current.path)
     ])
