@@ -30,7 +30,7 @@ class DisposeBag extends Disposable {
   }
 
   void add<T>(T disposable, [String? key]) {
-    var id = (key?.isNotEmpty == true) ? key! : createKey(disposable);
+    var id = (key != null && key.isNotEmpty) ? key : createKey(disposable);
     if (_bag.containsKey(id)) {
       throw ArgumentError('Duplicated key for disposable object.');
     }

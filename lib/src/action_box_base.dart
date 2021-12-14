@@ -16,7 +16,6 @@ abstract class ActionBoxBase<TActionDirectory extends ActionDirectory> {
 
   final Duration _defaultTimeout;
 
-
   Stream get exceptionStream => _errorStreamController.stream;
 
   ActionBoxBase(this._rootFactory,
@@ -38,6 +37,7 @@ abstract class ActionBoxBase<TActionDirectory extends ActionDirectory> {
           ActionDescriptor<TAction, TParam, TResult> Function(TActionDirectory)
               action) {
     var descriptor = action(_root);
-    return descriptor.call(_errorStreamController, _defaultTimeout, _cacheProvider);
+    return descriptor.call(
+        _errorStreamController, _defaultTimeout, _cacheProvider);
   }
 }

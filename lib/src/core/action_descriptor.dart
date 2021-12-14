@@ -21,8 +21,8 @@ class ActionDescriptor<TAction extends Action<TParam, TResult>, TParam, TResult>
     _action.dispose();
   }
 
-  ActionExecutor<TParam, TResult, TAction> call(
-          EventSink errorSink, Duration defaultTimeout, CacheProvider cacheProvider) =>
+  ActionExecutor<TParam, TResult, TAction> call(EventSink errorSink,
+          Duration defaultTimeout, CacheProvider cacheProvider) =>
       ActionExecutor(this, errorSink, defaultTimeout, cacheProvider);
 }
 
@@ -31,7 +31,8 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
   final EventSink _globalErrorSink;
   final Duration _timeout;
   final CacheProvider _cacheProvider;
-  ActionExecutor(this._descriptor, this._globalErrorSink, this._timeout, this._cacheProvider);
+  ActionExecutor(this._descriptor, this._globalErrorSink, this._timeout,
+      this._cacheProvider);
 
   TAction get _action => _descriptor._action;
   StreamController<Tuple2<Channel, TResult?>> get _pipeline => _action.pipeline;
@@ -117,8 +118,9 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
       final channel$ = _getChannel(channel);
 
       // Emit the executed result of the action to the selected channel.
-      temporalSubscription = (result ?? await _cacheProvider.readCache(_action, cacheStrategy, param))
-      // temporalSubscription = (result ?? await  _action.process(param))
+      temporalSubscription = (result ??
+              await _cacheProvider.readCache(_action, cacheStrategy, param))
+          // temporalSubscription = (result ?? await  _action.process(param))
           .timeout(timeout ?? _timeout)
           .transform<Tuple2<Channel, TResult?>>(
               StreamTransformer.fromHandlers(handleData: (data, sink) {

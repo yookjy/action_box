@@ -26,8 +26,10 @@ final actionBox = ActionBox.shared(
     //   .where((x) => x.isNotEmpty)
     //   .flatMap((x) =>
     //   (x as PublishSubject<Object>).distinct((pre, cur) => pre == cur))
-      cacheStorageProviders: [MemoryCache.create(), FileCache.fromPath(Directory.current.path)]
-    )
+    cacheStorageProviders: [
+      MemoryCache.create(),
+      FileCache.fromPath(Directory.current.path)
+    ])
   ..exceptionStream.listen((event) {
     print('global error handler => $event');
   });
@@ -58,7 +60,8 @@ void main() async {
   actionBox((a) => a.valueConverter.getStringToListValue).go(
       channel: (c) => c.ch1,
       param: 'value',
-      cacheStrategy: FileCacheStrategy('test_key_0000', expire: const Duration(minutes: 5)),
+      cacheStrategy: FileCacheStrategy('test_key_0000',
+          expire: const Duration(minutes: 5)),
       // cacheStrategy: MemoryCacheStrategy(expire: const Duration(minutes: 5)),
       begin: () {/* before dispatching */},
       end: (success) {/* after dispatching */},
@@ -68,8 +71,9 @@ void main() async {
 
   actionBox((a) => a.valueConverter.getStringToListValue).go(
       channel: (c) => c.ch1,
-      param: 'value1',
-      cacheStrategy: FileCacheStrategy('test_key_0000', expire: const Duration(minutes: 2)),
+      param: 'value',
+      cacheStrategy: FileCacheStrategy('test_key_0000',
+          expire: const Duration(minutes: 2)),
       begin: () {/* before dispatching */},
       end: (success) {/* after dispatching */},
       timeout: Duration(seconds: 10));

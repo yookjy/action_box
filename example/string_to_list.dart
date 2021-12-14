@@ -34,6 +34,4 @@ class StringToList extends Action<String, List<String>?> {
       return v;
     });
   }
-
-
 }

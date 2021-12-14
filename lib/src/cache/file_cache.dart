@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer';
 import 'dart:io';
 import 'dart:isolate';
 
@@ -16,7 +17,6 @@ abstract class FileCache extends CacheStorage {
 }
 
 class _FileCache extends FileCache {
-
   static final _cacheDirectory = 'local_cache/';
   static final _fileExt = '.json';
 
@@ -25,62 +25,64 @@ class _FileCache extends FileCache {
 
   _FileCache(this.path) : assert(path.isNotEmpty);
 
-  Future<Map?> _readIndex<TParam, TResult>(Action<TParam, TResult> action, covariant FileCacheStrategy strategy,  TParam? param) async {
-    var completer = Completer<Map?>();
+  Future<Map?> _readIndex<TParam, TResult>(Action<TParam, TResult> action,
+      covariant FileCacheStrategy strategy, TParam? param) async {
     var indexName = _getIndexName(action.serializeParameter(param));
 
-    // 메모리에 인덱스가 존재하지 않거나 파람키가 존재하지 않거나 만료되었으면, 인덱스 로드
-    if (!_indexMap.containsKey(strategy.key) || !_indexMap[strategy.key].containsKey(indexName)) {
-      var receivePort = ReceivePort();
-      Isolate? isolate;
-      StreamSubscription? subscription;
+    if (!_indexMap.containsKey(strategy.key) ||
+        !_indexMap[strategy.key].containsKey(indexName)) {
+      try {
+        // The index file is loaded directly without using 'Isolate.spawn()', because the file size is small.
+        var indexContents =
+            await _readFile(_getCachePath(strategy.key), indexName);
 
-      subscription = receivePort.listen((message) async {
-        await subscription?.cancel();
-        receivePort.close();
-        isolate?.kill();
-
-        if (message != null) {
-          Map index = json.decode(message);
+        if (indexContents != null) {
+          Map index = json.decode(indexContents);
           var expire = DateTime.parse(index['expire']);
           if (expire.compareTo(DateTime.now()) < 0) {
-            // 캐시가 만료 되었으므로 삭제 하고 중단.
             deleteCache(strategy.key, indexName, index['cache_name']);
+            log('Delete expired cache & index files.');
           } else {
-            // 메모리에 캐시 내용 저장
             var cache = _indexMap.putIfAbsent(strategy.key, () => {});
             cache[indexName] = index;
-            completer.complete(index);
-            return;
+            log('Loaded index onto memory. => $index');
+            return index;
           }
         }
-        completer.complete(null);
-      });
-
-      isolate = await Isolate.spawn(_readIndexFile, Messenger({
-        'path': _getCachePath(strategy.key),
-        'index_name': indexName,
-      }, receivePort.sendPort));
+      } catch (error) {
+        //ignore
+        log('Unable to read index file.');
+        log(error.toString());
+      }
     } else {
       var cache = _indexMap[strategy.key];
       var index = cache[indexName];
-      completer.complete(index);
+      // completer.complete(index);
+      log('A Index was founded in memory. => $index');
+      return index;
     }
-
-    return completer.future;
+    return null;
   }
 
   @override
-  FutureOr<Stream<TResult>> readCache<TParam, TResult>(Action<TParam, TResult> action, covariant FileCacheStrategy strategy, TParam? param) async {
+  FutureOr<Stream<TResult>> readCache<TParam, TResult>(
+      Action<TParam, TResult> action,
+      covariant FileCacheStrategy strategy,
+      TParam? param) async {
     var index = await _readIndex(action, strategy, param);
     TResult? data;
-    if (index != null && (data = await _readCacheData(action, strategy, index['cache_name'])) != null){
+    if (index != null &&
+        (data = await _readCacheData(action, strategy, index['cache_name'])) !=
+            null) {
       return Stream.value(data!);
     }
     return action.process(param);
   }
 
-  Future<TResult?> _readCacheData<TParam, TResult>(Action<TParam, TResult> action, FileCacheStrategy strategy, String cacheFileName) async {
+  Future<TResult?> _readCacheData<TParam, TResult>(
+      Action<TParam, TResult> action,
+      FileCacheStrategy strategy,
+      String cacheFileName) async {
     Isolate? isolate;
     StreamSubscription? subscription;
     var receivePort = ReceivePort();
@@ -98,16 +100,20 @@ class _FileCache extends FileCache {
       isolate?.kill();
     });
 
-    isolate = await Isolate.spawn(_readCacheFile, Messenger({
-      'path': _getCachePath(strategy.key),
-      'cache_name': cacheFileName,
-    }, receivePort.sendPort));
+    isolate = await Isolate.spawn(
+        _readCacheFile,
+        Messenger({
+          'path': _getCachePath(strategy.key),
+          'cache_name': cacheFileName,
+        }, receivePort.sendPort));
 
     return completer.future;
   }
 
   @override
-  FutureOr writeCache<TParam, TResult>(Action<TParam, TResult> action, covariant FileCacheStrategy strategy, TResult data, [TParam? param]) async {
+  FutureOr writeCache<TParam, TResult>(Action<TParam, TResult> action,
+      covariant FileCacheStrategy strategy, TResult data,
+      [TParam? param]) async {
     Map indexGroup = _indexMap.putIfAbsent(strategy.key, () => {});
     var indexName = _getIndexName(action.serializeParameter(param));
     var index = indexGroup.putIfAbsent(indexName, () => {});
@@ -115,11 +121,11 @@ class _FileCache extends FileCache {
 
     if (iso8601 != null) {
       if (DateTime.parse(iso8601).compareTo(DateTime.now()) < 0) {
-        //만료된 캐시 및 인덱스 제거
         indexGroup.remove(indexName);
+        log('Delete expired cache & index files.');
         deleteCache(strategy.key, indexName, index['cache_name']);
       } else {
-        //캐시가 유효하므로 스킵
+        log('Skip saving cache because the stored cache is valid.');
         return;
       }
     }
@@ -139,18 +145,21 @@ class _FileCache extends FileCache {
       isolate?.kill();
     });
 
-    isolate = await Isolate.spawn(_writeCacheFile, Messenger({
-      'path': _getCachePath(strategy.key),
-      'index_name': indexName,
-      'index_data': json.encode(index),
-      'cache_name': cacheFileName,
-      'cache_data': action.serializeResult(data)
-    }, receivePort.sendPort));
+    isolate = await Isolate.spawn(
+        _writeCacheFile,
+        Messenger({
+          'path': _getCachePath(strategy.key),
+          'index_name': indexName,
+          'index_data': json.encode(index),
+          'cache_name': cacheFileName,
+          'cache_data': action.serializeResult(data)
+        }, receivePort.sendPort));
   }
 
   String _getIndexName(String name) => 'index@${Uri.encodeFull(name)}';
 
-  void deleteCache(String strategyKey, String indexName, String cacheName) async {
+  void deleteCache(
+      String strategyKey, String indexName, String cacheName) async {
     Isolate? isolate;
     StreamSubscription? subscription;
     var receivePort = ReceivePort();
@@ -161,11 +170,13 @@ class _FileCache extends FileCache {
       isolate?.kill();
     });
 
-    isolate = await Isolate.spawn(_deleteCacheFile, Messenger({
-      'path': _getCachePath(strategyKey),
-      'index_name': indexName,
-      'cache_name': cacheName,
-    }, receivePort.sendPort));
+    isolate = await Isolate.spawn(
+        _deleteCacheFile,
+        Messenger({
+          'path': _getCachePath(strategyKey),
+          'index_name': indexName,
+          'cache_name': cacheName,
+        }, receivePort.sendPort));
   }
 
   static void _writeCacheFile(Messenger messenger) async {
@@ -177,29 +188,16 @@ class _FileCache extends FileCache {
 
     var success = false;
     try {
-      print('Saving cache to file. => $indexData');
+      log('Saving cache to file. => $indexData');
       await _writeFile(path, indexName, indexData);
       await _writeFile(path, cacheName, cacheData);
-      print('Save completed.');
+      log('Save completed.');
       success = true;
-    } catch(error) {
+    } catch (error) {
       //ignore
-      print(error);
+      log(error.toString());
     }
     messenger.reply(success);
-  }
-
-  static void _readIndexFile(Messenger messenger) async {
-    var path = messenger.parameters['path'];
-    var indexName = messenger.parameters['index_name'];
-
-    await _readFile(path, indexName).then((value) {
-      print('Read index file => $value');
-      messenger.reply(value);
-    }, onError: (error, stackTrace) {
-      print('Unable to read index file.');
-      messenger.reply(null);
-    });
   }
 
   static void _readCacheFile(Messenger messenger) async {
@@ -207,10 +205,10 @@ class _FileCache extends FileCache {
     var cacheName = messenger.parameters['cache_name'];
 
     await _readFile(path, cacheName).then((value) {
-      print('Read cache file => $value');
+      log('Read cache file => $value');
       messenger.reply(value);
     }, onError: (error, stackTrace) {
-      print('Unable to read cache file.');
+      log('Unable to read cache file.');
       messenger.reply(null);
     });
   }
@@ -225,9 +223,9 @@ class _FileCache extends FileCache {
       await _deleteFile(path, indexName);
       await _deleteFile(path, cacheName);
       success = true;
-    } catch(error) {
+    } catch (error) {
       //ignore
-      print(error);
+      log(error.toString());
     }
     messenger.reply(success);
   }
@@ -253,7 +251,8 @@ class _FileCache extends FileCache {
     return file;
   }
 
-  String _getCachePath(String directory) => _concatPath(_getCacheRoot(path), directory);
+  String _getCachePath(String directory) =>
+      _concatPath(_getCacheRoot(path), directory);
 
   String _getCacheRoot(String path) => _concatPath(path, _cacheDirectory);
 
@@ -280,14 +279,11 @@ class _FileCache extends FileCache {
     if (file.lengthSync() == 0) {
       completer.complete(null);
     } else {
-      file.openRead()
-        .transform(utf8.decoder)
-        .listen((data) {
-          completer.complete(data);
-        }, onError: (error, stackTrace) {
-          completer.completeError(error, stackTrace);
-        }
-      );
+      file.openRead().transform(utf8.decoder).listen((data) {
+        completer.complete(data);
+      }, onError: (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      });
     }
     return completer.future;
   }

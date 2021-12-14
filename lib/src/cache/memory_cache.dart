@@ -12,12 +12,13 @@ abstract class MemoryCache extends CacheStorage {
 }
 
 class _MemoryCache extends MemoryCache {
-
   final _cacheTable = <String, Map<String, Map<String, dynamic>>>{};
 
   @override
-  FutureOr<Stream<TResult>> readCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy strategy, TParam? param) {
-    if (_cacheTable.isNotEmpty && _cacheTable.containsKey(action.defaultChannel.id)) {
+  FutureOr<Stream<TResult>> readCache<TParam, TResult>(
+      Action<TParam, TResult> action, CacheStrategy strategy, TParam? param) {
+    if (_cacheTable.isNotEmpty &&
+        _cacheTable.containsKey(action.defaultChannel.id)) {
       var cache = _cacheTable[action.defaultChannel.id];
       var sectionKey = 'param@${action.serializeParameter(param)}';
       var section = cache?[sectionKey];
@@ -38,7 +39,8 @@ class _MemoryCache extends MemoryCache {
   Type get runtimeType => MemoryCache;
 
   @override
-  void writeCache<TParam, TResult>(Action<TParam, TResult> action, CacheStrategy strategy, TResult data, TParam? param) {
+  void writeCache<TParam, TResult>(Action<TParam, TResult> action,
+      CacheStrategy strategy, TResult data, TParam? param) {
     try {
       _cacheTable[action.defaultChannel.id] = {
         'param@${action.serializeParameter(param)}': {
@@ -46,7 +48,7 @@ class _MemoryCache extends MemoryCache {
           'data': data
         }
       };
-    } catch(e) {
+    } catch (e) {
       //ignore
       print(e);
     }

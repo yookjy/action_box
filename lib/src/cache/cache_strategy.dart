@@ -12,7 +12,8 @@ abstract class CacheStrategy<TCacheType extends CacheStorage> {
 class FileCacheStrategy extends CacheStrategy<FileCache> {
   final String key;
 
-  FileCacheStrategy(this.key, {required Duration expire}) : super(expire: expire);
+  FileCacheStrategy(this.key, {required Duration expire})
+      : super(expire: expire);
 }
 
 class MemoryCacheStrategy extends CacheStrategy<MemoryCache> {

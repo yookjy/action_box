@@ -9,8 +9,7 @@ import 'string_to_list.dart';
 class ActionBox extends ActionBoxBase<_ActionRoot> {
   static ActionBox? _instance;
   ActionBox._(StreamController<dynamic> Function()? errorStreamFactory,
-      Duration? defaultTimeout,
-      List<CacheStorage>? cacheStorages)
+      Duration? defaultTimeout, List<CacheStorage>? cacheStorages)
       : super(() => _ActionRoot(),
             errorStreamFactory: errorStreamFactory,
             defaultTimeout: defaultTimeout,
@@ -20,7 +19,8 @@ class ActionBox extends ActionBoxBase<_ActionRoot> {
           {StreamController<dynamic> Function()? errorStreamFactory,
           Duration? defaultTimeout,
           List<CacheStorage>? cacheStorageProviders}) =>
-      _instance ??= ActionBox._(errorStreamFactory, defaultTimeout, cacheStorageProviders);
+      _instance ??= ActionBox._(
+          errorStreamFactory, defaultTimeout, cacheStorageProviders);
 
   @override
   void dispose() {
