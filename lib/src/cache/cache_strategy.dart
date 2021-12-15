@@ -6,16 +6,16 @@ abstract class CacheStrategy<TCacheType extends CacheStorage> {
   final Duration expire;
   Type get cacheStorageType => TCacheType;
 
-  CacheStrategy({required this.expire});
+  const CacheStrategy({required this.expire});
 }
 
 class FileCacheStrategy extends CacheStrategy<FileCache> {
   final String key;
 
-  FileCacheStrategy(this.key, {required Duration expire})
+  const FileCacheStrategy(this.key, {required Duration expire})
       : super(expire: expire);
 }
 
 class MemoryCacheStrategy extends CacheStrategy<MemoryCache> {
-  MemoryCacheStrategy({required Duration expire}) : super(expire: expire);
+  const MemoryCacheStrategy({required Duration expire}) : super(expire: expire);
 }

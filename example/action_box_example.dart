@@ -57,8 +57,8 @@ void main() async {
   actionBox((a) => a.valueConverter.getStringToListValue).go(
       channel: (c) => c.ch1,
       param: 'value',
-      cacheStrategy: FileCacheStrategy('test_key_0000',
-          expire: const Duration(minutes: 5)),
+      cacheStrategy: const FileCacheStrategy('test_key_0000',
+          expire: Duration(minutes: 5)),
       // cacheStrategy: MemoryCacheStrategy(expire: const Duration(minutes: 5)),
       begin: () {/* before dispatching */},
       end: (success) {/* after dispatching */},
@@ -69,8 +69,8 @@ void main() async {
   actionBox((a) => a.valueConverter.getStringToListValue).go(
       channel: (c) => c.ch1,
       param: 'value',
-      cacheStrategy: FileCacheStrategy('test_key_0000',
-          expire: const Duration(minutes: 2)),
+      cacheStrategy: const FileCacheStrategy('test_key_0000',
+          expire: Duration(minutes: 2)),
       begin: () {/* before dispatching */},
       end: (success) {/* after dispatching */},
       timeout: Duration(seconds: 10));
