@@ -1,12 +1,11 @@
 import 'dart:async';
 
-import 'package:action_box/action_box.dart';
 import 'package:action_box/src/cache/cache_provider.dart';
-import 'package:action_box/src/cache/cache_storage.dart';
 import 'package:action_box/src/cache/cache_strategy.dart';
 import 'package:action_box/src/core/action.dart';
 import 'package:action_box/src/core/channel.dart';
 import 'package:action_box/src/utils/cloneable.dart';
+import 'package:action_box/src/utils/disposable.dart';
 import 'package:action_box/src/utils/tuple.dart';
 
 class ActionDescriptor<TAction extends Action<TParam, TResult>, TParam, TResult>
@@ -120,7 +119,6 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
       // Emit the executed result of the action to the selected channel.
       temporalSubscription = (result ??
               await _cacheProvider.readCache(_action, cacheStrategy, param))
-          // temporalSubscription = (result ?? await  _action.process(param))
           .timeout(timeout ?? _timeout)
           .transform<Tuple2<Channel, TResult?>>(
               StreamTransformer.fromHandlers(handleData: (data, sink) {
@@ -148,9 +146,9 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
           var err = stackTrace == null ? error : Tuple2(error, stackTrace);
           _addError(sink, err);
         });
-      }, onDone: () async {
+      }, onDone: () {
         end?.call(done);
-        await temporalSubscription?.cancel();
+        temporalSubscription?.cancel();
       });
     } catch (error) {
       errorStreamSinks

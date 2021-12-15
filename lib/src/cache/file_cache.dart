@@ -40,7 +40,7 @@ class _FileCache extends FileCache {
           Map index = json.decode(indexContents);
           var expire = DateTime.parse(index['expire']);
           if (expire.compareTo(DateTime.now()) < 0) {
-            deleteCache(strategy.key, indexName, index['cache_name']);
+            _deleteCache(strategy.key, indexName, index['cache_name']);
             log('Delete expired cache & index files.');
           } else {
             var cache = _indexMap.putIfAbsent(strategy.key, () => {});
@@ -82,38 +82,30 @@ class _FileCache extends FileCache {
   Future<TResult?> _readCacheData<TParam, TResult>(
       Action<TParam, TResult> action,
       FileCacheStrategy strategy,
-      String cacheFileName) async {
-    Isolate? isolate;
-    StreamSubscription? subscription;
-    var receivePort = ReceivePort();
+      String cacheFileName) {
     var completer = Completer<TResult?>();
-
-    subscription = receivePort.listen((message) async {
-      if (message != null) {
-        var result = action.deserializeResult(message);
-        completer.complete(result);
-      } else {
-        completer.complete(null);
-      }
-      await subscription?.cancel();
-      receivePort.close();
-      isolate?.kill();
-    });
-
-    isolate = await Isolate.spawn(
-        _readCacheFile,
-        Messenger({
+    _spawn(
+        entryPoint: _readCacheFile,
+        parameters: {
           'path': _getCachePath(strategy.key),
           'cache_name': cacheFileName,
-        }, receivePort.sendPort));
+        },
+        onData: (message) {
+          if (message != null) {
+            var result = action.deserializeResult(message);
+            completer.complete(result);
+          } else {
+            completer.complete(null);
+          }
+        });
 
     return completer.future;
   }
 
   @override
-  FutureOr writeCache<TParam, TResult>(Action<TParam, TResult> action,
+  void writeCache<TParam, TResult>(Action<TParam, TResult> action,
       covariant FileCacheStrategy strategy, TResult data,
-      [TParam? param]) async {
+      [TParam? param]) {
     Map indexGroup = _indexMap.putIfAbsent(strategy.key, () => {});
     var indexName = _getIndexName(action.serializeParameter(param));
     var index = indexGroup.putIfAbsent(indexName, () => {});
@@ -123,7 +115,7 @@ class _FileCache extends FileCache {
       if (DateTime.parse(iso8601).compareTo(DateTime.now()) < 0) {
         indexGroup.remove(indexName);
         log('Delete expired cache & index files.');
-        deleteCache(strategy.key, indexName, index['cache_name']);
+        _deleteCache(strategy.key, indexName, index['cache_name']);
       } else {
         log('Skip saving cache because the stored cache is valid.');
         return;
@@ -135,51 +127,106 @@ class _FileCache extends FileCache {
     index['expire'] = DateTime.now().add(strategy.expire).toIso8601String();
     index['cache_name'] = cacheFileName;
 
-    Isolate? isolate;
-    StreamSubscription? subscription;
-    var receivePort = ReceivePort();
-
-    subscription = receivePort.listen((_) async {
-      await subscription?.cancel();
-      receivePort.close();
-      isolate?.kill();
-    });
-
-    isolate = await Isolate.spawn(
-        _writeCacheFile,
-        Messenger({
+    _spawn(
+        entryPoint: _writeCacheFile,
+        parameters: {
           'path': _getCachePath(strategy.key),
           'index_name': indexName,
           'index_data': json.encode(index),
           'cache_name': cacheFileName,
           'cache_data': action.serializeResult(data)
-        }, receivePort.sendPort));
+        },
+        onData: (_) => null);
   }
 
+  void _deleteCache(String strategyKey, String indexName, String cacheName) {
+    _spawn(
+        entryPoint: _deleteCacheFile,
+        parameters: {
+          'path': _getCachePath(strategyKey),
+          'index_name': indexName,
+          'cache_name': cacheName,
+        },
+        onData: (_) => null);
+  }
+
+  @override
+  Type get runtimeType => FileCache;
+
+  @override
+  void clear() {
+    var path = _getCacheRoot(this.path);
+    var directory = Directory(path);
+    if (directory.existsSync()) {
+      directory.delete(recursive: true);
+    }
+  }
+
+  @override
+  FutureOr dispose() {
+    if (_indexMap.isNotEmpty) {
+      _indexMap.clear();
+    }
+  }
+
+  String _getCachePath(String directory) =>
+      _concatPath(_getCacheRoot(path), directory);
+  String _getCacheRoot(String path) => _concatPath(path, _cacheDirectory);
   String _getIndexName(String name) => 'index@${Uri.encodeFull(name)}';
 
-  void deleteCache(
-      String strategyKey, String indexName, String cacheName) async {
+  void _spawn(
+      {required Function(_Messenger) entryPoint,
+      required Map<String, dynamic> parameters,
+      required Function(dynamic) onData}) async {
     Isolate? isolate;
     StreamSubscription? subscription;
     var receivePort = ReceivePort();
 
-    subscription = receivePort.listen((_) async {
+    subscription = receivePort.listen((message) async {
+      onData(message);
       await subscription?.cancel();
       receivePort.close();
       isolate?.kill();
     });
 
     isolate = await Isolate.spawn(
-        _deleteCacheFile,
-        Messenger({
-          'path': _getCachePath(strategyKey),
-          'index_name': indexName,
-          'cache_name': cacheName,
-        }, receivePort.sendPort));
+        entryPoint, _Messenger(parameters, receivePort.sendPort));
   }
 
-  static void _writeCacheFile(Messenger messenger) async {
+  static String _concatPath(String path, String path2) {
+    var filePath = path;
+    var separator = filePath.substring(filePath.length - 1, filePath.length);
+
+    if (separator != r'/' && separator != r'\') {
+      filePath += '/';
+    }
+
+    return filePath + path2;
+  }
+
+  static File _getFile(String path, String fileName) {
+    var filePath = _concatPath(path, fileName);
+    var file = File(filePath);
+    if (!file.existsSync()) {
+      file.createSync();
+    }
+    return file;
+  }
+
+  static void _readCacheFile(_Messenger messenger) async {
+    var path = messenger.parameters['path'];
+    var cacheName = messenger.parameters['cache_name'];
+
+    await _readFile(path, cacheName).then((value) {
+      log('Read cache file => $value');
+      messenger.reply(value);
+    }, onError: (error, stackTrace) {
+      log('Unable to read cache file.');
+      messenger.reply(null);
+    });
+  }
+
+  static void _writeCacheFile(_Messenger messenger) async {
     var path = messenger.parameters['path'];
     var indexName = messenger.parameters['index_name'];
     var indexData = messenger.parameters['index_data'];
@@ -200,20 +247,7 @@ class _FileCache extends FileCache {
     messenger.reply(success);
   }
 
-  static void _readCacheFile(Messenger messenger) async {
-    var path = messenger.parameters['path'];
-    var cacheName = messenger.parameters['cache_name'];
-
-    await _readFile(path, cacheName).then((value) {
-      log('Read cache file => $value');
-      messenger.reply(value);
-    }, onError: (error, stackTrace) {
-      log('Unable to read cache file.');
-      messenger.reply(null);
-    });
-  }
-
-  static void _deleteCacheFile(Messenger messenger) async {
+  static void _deleteCacheFile(_Messenger messenger) async {
     var path = messenger.parameters['path'];
     var indexName = messenger.parameters['index_name'];
     var cacheName = messenger.parameters['cache_name'];
@@ -228,43 +262,6 @@ class _FileCache extends FileCache {
       log(error.toString());
     }
     messenger.reply(success);
-  }
-
-  @override
-  Type get runtimeType => FileCache;
-
-  @override
-  void clear() {
-    var path = _getCacheRoot(this.path);
-    var directory = Directory(path);
-    if (directory.existsSync()) {
-      directory.delete(recursive: true);
-    }
-  }
-
-  static File _getFile(String path, String fileName) {
-    var filePath = _concatPath(path, fileName);
-    var file = File(filePath);
-    if (!file.existsSync()) {
-      file.createSync();
-    }
-    return file;
-  }
-
-  String _getCachePath(String directory) =>
-      _concatPath(_getCacheRoot(path), directory);
-
-  String _getCacheRoot(String path) => _concatPath(path, _cacheDirectory);
-
-  static String _concatPath(String path, String path2) {
-    var filePath = path;
-    var separator = filePath.substring(filePath.length - 1, filePath.length);
-
-    if (separator != r'/' && separator != r'\') {
-      filePath += '/';
-    }
-
-    return filePath + path2;
   }
 
   static Future<String?> _readFile(String path, String fileName) async {
@@ -308,20 +305,13 @@ class _FileCache extends FileCache {
       return file.delete();
     }
   }
-
-  @override
-  FutureOr dispose() {
-    if (_indexMap.isNotEmpty) {
-      _indexMap.clear();
-    }
-  }
 }
 
-class Messenger {
+class _Messenger {
   final SendPort _reply;
   final Map<String, dynamic> parameters;
 
-  Messenger(this.parameters, this._reply);
+  _Messenger(this.parameters, this._reply);
 
   void reply(Object? value) => _reply.send(value);
 }

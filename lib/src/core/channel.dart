@@ -8,8 +8,6 @@ class Channel {
 
   Channel() : _ids = [UUID.v4()];
 
-  // Channel({String? uuid}) : _ids = [uuid ?? UUID.v4()];
-
   Channel._from(this._ids);
 
   Channel operator |(covariant Channel other) {
