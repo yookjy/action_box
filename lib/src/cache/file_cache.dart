@@ -5,7 +5,6 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:action_box/src/cache/cache_strategy.dart';
-import 'package:action_box/src/core/action.dart';
 import 'package:action_box/src/utils/uuid.dart';
 
 import 'cache_storage.dart';
@@ -18,32 +17,28 @@ abstract class FileCache extends CacheStorage {
 
 class _FileCache extends FileCache {
   static final _cacheDirectory = 'local_cache/';
-  static final _fileExt = '.json';
 
   final Map<String, dynamic> _indexMap = {};
   final String path;
 
   _FileCache(this.path) : assert(path.isNotEmpty);
 
-  Future<Map?> _readIndex<TParam, TResult>(Action<TParam, TResult> action,
-      covariant FileCacheStrategy strategy, TParam? param) async {
-    var indexName = _getIndexName(action.serializeParameter(param));
-
-    if (!_indexMap.containsKey(strategy.key) ||
-        !_indexMap[strategy.key].containsKey(indexName)) {
+  Future<Map?> _readIndex<TParam, TResult>(String id, String indexName,
+      CacheStrategy strategy, TParam? param) async {
+    if (!_indexMap.containsKey(id) || !_indexMap[id].containsKey(indexName)) {
       try {
         // The index file is loaded directly without using 'Isolate.spawn()', because the file size is small.
-        var indexContents =
-            await _readFile(_getCachePath(strategy.key), indexName);
+        var indexContents = await _readFile(
+            _getCachePath(id), '$indexName.json', const Utf8Decoder());
 
-        if (indexContents != null) {
+        if (indexContents.isNotEmpty) {
           Map index = json.decode(indexContents);
           var expire = DateTime.parse(index['expire']);
           if (expire.compareTo(DateTime.now()) < 0) {
-            _deleteCache(strategy.key, indexName, index['cache_name']);
+            _deleteCache(id, indexName, index['cache_name']);
             log('Delete expired cache & index files.');
           } else {
-            var cache = _indexMap.putIfAbsent(strategy.key, () => {});
+            var cache = _indexMap.putIfAbsent(id, () => {});
             cache[indexName] = index;
             log('Loaded index onto memory. => $index');
             return index;
@@ -55,9 +50,8 @@ class _FileCache extends FileCache {
         log(error.toString());
       }
     } else {
-      var cache = _indexMap[strategy.key];
+      var cache = _indexMap[id];
       var index = cache[indexName];
-      // completer.complete(index);
       log('A Index was founded in memory. => $index');
       return index;
     }
@@ -66,33 +60,35 @@ class _FileCache extends FileCache {
 
   @override
   FutureOr<Stream<TResult>> readCache<TParam, TResult>(
-      Action<TParam, TResult> action,
-      covariant FileCacheStrategy strategy,
+      String id,
+      FutureOr<Stream<TResult>> Function([TParam?]) ifAbsent,
+      CacheStrategy strategy,
       TParam? param) async {
-    var index = await _readIndex(action, strategy, param);
+    var index = await _readIndex(
+        id, _getIndexName(json.encode(param)), strategy, param);
     TResult? data;
     if (index != null &&
-        (data = await _readCacheData(action, strategy, index['cache_name'])) !=
+        (data = await _readCacheData(id, strategy, index['cache_name'])) !=
             null) {
       return Stream.value(data!);
     }
-    return action.process(param);
+    return ifAbsent(param);
   }
 
   Future<TResult?> _readCacheData<TParam, TResult>(
-      Action<TParam, TResult> action,
-      FileCacheStrategy strategy,
-      String cacheFileName) {
+      String id, CacheStrategy strategy, String cacheFileName) {
     var completer = Completer<TResult?>();
+    var isJson = strategy.codec is JsonCodec;
     _spawn(
         entryPoint: _readCacheFile,
         parameters: {
-          'path': _getCachePath(strategy.key),
+          'path': _getCachePath(id),
+          'is_json': isJson,
           'cache_name': cacheFileName,
         },
         onData: (message) {
           if (message != null) {
-            var result = action.deserializeResult(message);
+            var result = strategy.codec.decode(message);
             completer.complete(result);
           } else {
             completer.complete(null);
@@ -103,11 +99,11 @@ class _FileCache extends FileCache {
   }
 
   @override
-  void writeCache<TParam, TResult>(Action<TParam, TResult> action,
-      covariant FileCacheStrategy strategy, TResult data,
+  void writeCache<TParam, TResult>(
+      String id, CacheStrategy strategy, TResult data,
       [TParam? param]) {
-    Map indexGroup = _indexMap.putIfAbsent(strategy.key, () => {});
-    var indexName = _getIndexName(action.serializeParameter(param));
+    Map indexGroup = _indexMap.putIfAbsent(id, () => {});
+    var indexName = _getIndexName(json.encode(param));
     var index = indexGroup.putIfAbsent(indexName, () => {});
     var iso8601 = index['expire'];
 
@@ -115,7 +111,7 @@ class _FileCache extends FileCache {
       if (DateTime.parse(iso8601).compareTo(DateTime.now()) < 0) {
         indexGroup.remove(indexName);
         log('Delete expired cache & index files.');
-        _deleteCache(strategy.key, indexName, index['cache_name']);
+        _deleteCache(id, indexName, index['cache_name']);
       } else {
         log('Skip saving cache because the stored cache is valid.');
         return;
@@ -130,20 +126,20 @@ class _FileCache extends FileCache {
     _spawn(
         entryPoint: _writeCacheFile,
         parameters: {
-          'path': _getCachePath(strategy.key),
+          'path': _getCachePath(id),
           'index_name': indexName,
           'index_data': json.encode(index),
           'cache_name': cacheFileName,
-          'cache_data': action.serializeResult(data)
+          'cache_data': strategy.codec.encode(data)
         },
         onData: (_) => null);
   }
 
-  void _deleteCache(String strategyKey, String indexName, String cacheName) {
+  void _deleteCache(String id, String indexName, String cacheName) {
     _spawn(
         entryPoint: _deleteCacheFile,
         parameters: {
-          'path': _getCachePath(strategyKey),
+          'path': _getCachePath(id),
           'index_name': indexName,
           'cache_name': cacheName,
         },
@@ -172,7 +168,8 @@ class _FileCache extends FileCache {
   String _getCachePath(String directory) =>
       _concatPath(_getCacheRoot(path), directory);
   String _getCacheRoot(String path) => _concatPath(path, _cacheDirectory);
-  String _getIndexName(String name) => 'index@${Uri.encodeFull(name)}';
+  String _getIndexName(Object name) =>
+      'index@${Uri.encodeFull(name.toString())}';
 
   void _spawn(
       {required Function(_Messenger) entryPoint,
@@ -214,10 +211,15 @@ class _FileCache extends FileCache {
   }
 
   static void _readCacheFile(_Messenger messenger) async {
+    Utf8Decoder? utf8decoder;
     var path = messenger.parameters['path'];
     var cacheName = messenger.parameters['cache_name'];
 
-    await _readFile(path, cacheName).then((value) {
+    if (messenger.parameters['is_json']) {
+      utf8decoder = Utf8Decoder();
+    }
+
+    await _readFile(path, '$cacheName.cache', utf8decoder).then((value) {
       log('Read cache file => $value');
       messenger.reply(value);
     }, onError: (error, stackTrace) {
@@ -236,8 +238,8 @@ class _FileCache extends FileCache {
     var success = false;
     try {
       log('Saving cache to file. => $indexData');
-      await _writeFile(path, indexName, indexData);
-      await _writeFile(path, cacheName, cacheData);
+      await _writeFile(path, '$indexName.json', indexData);
+      await _writeFile(path, '$cacheName.cache', cacheData);
       log('Save completed.');
       success = true;
     } catch (error) {
@@ -254,8 +256,8 @@ class _FileCache extends FileCache {
 
     var success = false;
     try {
-      await _deleteFile(path, indexName);
-      await _deleteFile(path, cacheName);
+      await _deleteFile(path, '$indexName.json');
+      await _deleteFile(path, '$cacheName.cache');
       success = true;
     } catch (error) {
       //ignore
@@ -264,19 +266,21 @@ class _FileCache extends FileCache {
     messenger.reply(success);
   }
 
-  static Future<String?> _readFile(String path, String fileName) async {
-    var completer = Completer<String?>();
+  static Future<dynamic> _readFile(
+      String path, String fileName, Utf8Decoder? decoder) async {
+    var completer = Completer();
 
     var cacheDir = Directory(path);
     if (!await cacheDir.exists()) {
       cacheDir = await cacheDir.create(recursive: true);
     }
 
-    var file = _getFile(cacheDir.path, '$fileName$_fileExt');
+    var file = _getFile(cacheDir.path, fileName);
     if (file.lengthSync() == 0) {
-      completer.complete(null);
+      completer.complete();
     } else {
-      file.openRead().transform(utf8.decoder).listen((data) {
+      (decoder == null ? file.openRead() : file.openRead().transform(decoder))
+          .listen((data) {
         completer.complete(data);
       }, onError: (error, stackTrace) {
         completer.completeError(error, stackTrace);
@@ -291,15 +295,19 @@ class _FileCache extends FileCache {
       cacheDir = await cacheDir.create(recursive: true);
     }
 
-    var file = _getFile(cacheDir.path, '$fileName$_fileExt');
+    var file = _getFile(cacheDir.path, fileName);
     var sink = file.openWrite();
-    sink.write(data);
+    if (data is List<int>) {
+      sink.add(data);
+    } else {
+      sink.write(data);
+    }
     await sink.flush();
     return await sink.close();
   }
 
   static FutureOr _deleteFile(String path, String fileName) async {
-    var filePath = _concatPath(path, '$fileName$_fileExt');
+    var filePath = _concatPath(path, fileName);
     var file = File(filePath);
     if (await file.exists()) {
       return file.delete();

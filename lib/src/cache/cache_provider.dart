@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:action_box/src/cache/cache_storage.dart';
 import 'package:action_box/src/cache/cache_strategy.dart';
-import 'package:action_box/src/core/action.dart';
 
 class CacheProvider extends CacheStorage {
   final List<CacheStorage?> _storages;
@@ -11,19 +10,23 @@ class CacheProvider extends CacheStorage {
 
   @override
   FutureOr<Stream<TResult>> readCache<TParam, TResult>(
-      Action<TParam, TResult> action, CacheStrategy? strategy, TParam? param) {
+      String id,
+      FutureOr<Stream<TResult>> Function([TParam?]) ifAbsent,
+      CacheStrategy? strategy,
+      TParam? param) {
     CacheStorage? storage;
     if (strategy == null || (storage = _getStorage(strategy)) == null) {
-      return action.process(param);
+      return ifAbsent(param);
     }
-    return storage!.readCache(action, strategy, param);
+
+    return storage!.readCache(id, ifAbsent, strategy, param);
   }
 
   @override
-  void writeCache<TParam, TResult>(Action<TParam, TResult> action,
-      CacheStrategy? strategy, TResult data, TParam? param) {
+  void writeCache<TParam, TResult>(
+      String id, CacheStrategy? strategy, TResult data, TParam? param) {
     if (strategy != null) {
-      _getStorage(strategy)?.writeCache(action, strategy, data, param);
+      _getStorage(strategy)?.writeCache(id, strategy, data, param);
     }
   }
 

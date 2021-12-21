@@ -9,6 +9,8 @@ abstract class ActionDirectory implements Disposable {
   late Map<String, ActionDescriptor> _actionDescriptors;
   late Map<String, ActionDirectory> _actionDirectories;
 
+  String? alias;
+
   ActionDirectory() {
     _actionDescriptors = HashMap();
     _actionDirectories = HashMap();
@@ -16,12 +18,16 @@ abstract class ActionDirectory implements Disposable {
 
   TActionDirectory
       putIfAbsentDirectory<TActionDirectory extends ActionDirectory>(
-          String directoryKey, TActionDirectory Function() factory) {
-    if (directoryKey.isEmpty) {
-      throw ArgumentError.value(directoryKey);
+          String permanentKey, TActionDirectory Function() factory) {
+    if (permanentKey.isEmpty) {
+      throw ArgumentError.value(permanentKey);
     }
     final directory = _actionDirectories.putIfAbsent(
-        directoryKey, () => factory()) as TActionDirectory;
+        permanentKey, () => factory()) as TActionDirectory;
+
+    if (directory.alias?.isEmpty ?? true) {
+      directory.alias = _makePath(permanentKey);
+    }
 
     return directory;
   }
@@ -29,17 +35,24 @@ abstract class ActionDirectory implements Disposable {
   ActionDescriptor<TAction, TParam, TResult> putIfAbsentDescriptor<
       TAction extends Action<TParam, TResult>,
       TParam,
-      TResult>(String descriptorKey, TAction Function() factory) {
-    if (descriptorKey.isEmpty) {
-      throw ArgumentError.value(descriptorKey);
+      TResult>(String permanentKey, TAction Function() factory) {
+    if (permanentKey.isEmpty) {
+      throw ArgumentError.value(permanentKey);
     }
 
-    final descriptor = _actionDescriptors.putIfAbsent(descriptorKey,
+    final descriptor = _actionDescriptors.putIfAbsent(permanentKey,
             () => ActionDescriptor<TAction, TParam, TResult>(factory))
         as ActionDescriptor<TAction, TParam, TResult>;
 
+    if (descriptor.alias?.isEmpty ?? true) {
+      descriptor.alias = _makePath(permanentKey);
+    }
+
     return descriptor;
   }
+
+  String _makePath(String key) =>
+      (alias?.isEmpty ?? true) ? key : '$alias.$key';
 
   @override
   FutureOr dispose() {

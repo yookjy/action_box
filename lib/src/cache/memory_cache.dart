@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:action_box/src/cache/cache_storage.dart';
 import 'package:action_box/src/cache/cache_strategy.dart';
-import 'package:action_box/src/core/action.dart';
 
 abstract class MemoryCache extends CacheStorage {
   const MemoryCache();
@@ -16,11 +15,13 @@ class _MemoryCache extends MemoryCache {
 
   @override
   FutureOr<Stream<TResult>> readCache<TParam, TResult>(
-      Action<TParam, TResult> action, CacheStrategy strategy, TParam? param) {
-    if (_cacheTable.isNotEmpty &&
-        _cacheTable.containsKey(action.defaultChannel.id)) {
-      var cache = _cacheTable[action.defaultChannel.id];
-      var sectionKey = 'param@${action.serializeParameter(param)}';
+      String id,
+      FutureOr<Stream<TResult>> Function([TParam?]) ifAbsent,
+      CacheStrategy strategy,
+      TParam? param) {
+    if (_cacheTable.isNotEmpty && _cacheTable.containsKey(id)) {
+      var cache = _cacheTable[id];
+      var sectionKey = 'param@${Uri.encodeFull(json.encode(param))}';
       var section = cache?[sectionKey];
       if (section != null) {
         var expire = (section['expire'] as DateTime).compareTo(DateTime.now());
@@ -32,18 +33,18 @@ class _MemoryCache extends MemoryCache {
         }
       }
     }
-    return action.process(param);
+    return ifAbsent(param);
   }
 
   @override
   Type get runtimeType => MemoryCache;
 
   @override
-  void writeCache<TParam, TResult>(Action<TParam, TResult> action,
-      CacheStrategy strategy, TResult data, TParam? param) {
+  void writeCache<TParam, TResult>(
+      String id, CacheStrategy strategy, TResult data, TParam? param) {
     try {
-      _cacheTable[action.defaultChannel.id] = {
-        'param@${action.serializeParameter(param)}': {
+      _cacheTable[id] = {
+        'param@${Uri.encodeFull(json.encode(param))}': {
           'expire': DateTime.now().add(strategy.expire),
           'data': data
         }

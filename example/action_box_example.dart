@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:action_box/action_box.dart';
 // import 'package:rxdart/rxdart.dart';
@@ -57,9 +56,8 @@ void main() async {
   actionBox((a) => a.valueConverter.getStringToListValue).go(
       channel: (c) => c.ch1,
       param: 'value',
-      cacheStrategy: const FileCacheStrategy('test_key_0000',
-          expire: Duration(minutes: 5)),
-      // cacheStrategy: MemoryCacheStrategy(expire: const Duration(minutes: 5)),
+      cacheStrategy: const CacheStrategy.file(Duration(minutes: 5),
+          codec: JsonCodec(reviver: Revivers.stringArr)),
       begin: () {/* before dispatching */},
       end: (success) {/* after dispatching */},
       timeout: Duration(seconds: 10));
@@ -69,8 +67,8 @@ void main() async {
   actionBox((a) => a.valueConverter.getStringToListValue).go(
       channel: (c) => c.ch1,
       param: 'value',
-      cacheStrategy: const FileCacheStrategy('test_key_0000',
-          expire: Duration(minutes: 2)),
+      cacheStrategy: const CacheStrategy.file(Duration(minutes: 2),
+          codec: JsonCodec(reviver: Revivers.stringArr)),
       begin: () {/* before dispatching */},
       end: (success) {/* after dispatching */},
       timeout: Duration(seconds: 10));
@@ -108,4 +106,13 @@ void main() async {
   bag.dispose();
   actionBox.dispose();
   print('terminated!');
+}
+
+class Revivers {
+  static Object stringArr(k, v) {
+    if (v is List) {
+      return v.cast<String>().toList();
+    }
+    return v;
+  }
 }

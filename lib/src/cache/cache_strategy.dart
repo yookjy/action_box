@@ -1,21 +1,21 @@
-import 'package:action_box/src/cache/cache_storage.dart';
+import 'dart:convert';
+
 import 'package:action_box/src/cache/file_cache.dart';
 import 'package:action_box/src/cache/memory_cache.dart';
 
-abstract class CacheStrategy<TCacheType extends CacheStorage> {
+class CacheStrategy {
   final Duration expire;
-  Type get cacheStorageType => TCacheType;
+  final Type cacheStorageType;
+  final Codec codec;
 
-  const CacheStrategy({required this.expire});
-}
-
-class FileCacheStrategy extends CacheStrategy<FileCache> {
-  final String key;
-
-  const FileCacheStrategy(this.key, {required Duration expire})
-      : super(expire: expire);
-}
-
-class MemoryCacheStrategy extends CacheStrategy<MemoryCache> {
-  const MemoryCacheStrategy({required Duration expire}) : super(expire: expire);
+  const CacheStrategy(
+      {required this.cacheStorageType,
+      required this.expire,
+      this.codec = const JsonCodec()});
+  const CacheStrategy.file(this.expire, {Codec? codec})
+      : cacheStorageType = FileCache,
+        codec = codec ?? const JsonCodec();
+  const CacheStrategy.memory(this.expire, {Codec? codec})
+      : cacheStorageType = MemoryCache,
+        codec = codec ?? const JsonCodec();
 }

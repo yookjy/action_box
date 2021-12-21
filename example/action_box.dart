@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:action_box/action_box.dart';
-import 'package:action_box/src/cache/cache_storage.dart';
 
 import 'string_to_char.dart';
 import 'string_to_list.dart';
@@ -32,11 +31,22 @@ class ActionBox extends ActionBoxBase<_ActionRoot> {
 class _ActionRoot extends ActionDirectory {
   _ValueConverter get valueConverter =>
       putIfAbsentDirectory('valueConverter', () => _ValueConverter());
+
+  _NestedTest1 get test1 =>
+      putIfAbsentDirectory('nestedTest1', () => _NestedTest1());
+}
+
+class _NestedTest1 extends ActionDirectory {
+  _NestedTest2 get test2 =>
+      putIfAbsentDirectory('nestedTest2', () => _NestedTest2());
+}
+
+class _NestedTest2 extends ActionDirectory {
+  _ValueConverter get valueConverter =>
+      putIfAbsentDirectory('valueConverter', () => _ValueConverter());
 }
 
 class _ValueConverter extends ActionDirectory {
-  _ValueConverter() : super();
-
   ActionDescriptor<StringToList, String, List<String>?>
       get getStringToListValue =>
           putIfAbsentDescriptor('getStringToListValue', () => StringToList());

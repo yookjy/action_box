@@ -13,6 +13,8 @@ class ActionDescriptor<TAction extends Action<TParam, TResult>, TParam, TResult>
   final TAction Function() _factory;
   late final TAction _action = _factory();
 
+  String? alias;
+
   ActionDescriptor(this._factory);
 
   @override
@@ -22,19 +24,17 @@ class ActionDescriptor<TAction extends Action<TParam, TResult>, TParam, TResult>
 
   ActionExecutor<TParam, TResult, TAction> call(EventSink errorSink,
           Duration defaultTimeout, CacheProvider cacheProvider) =>
-      ActionExecutor(this, errorSink, defaultTimeout, cacheProvider);
+      _ActionExecutor(this, errorSink, defaultTimeout, cacheProvider);
 }
 
-class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
+abstract class ActionExecutor<TParam, TResult,
+    TAction extends Action<TParam, TResult>> {
   final ActionDescriptor<TAction, TParam, TResult> _descriptor;
   final EventSink _globalErrorSink;
   final Duration _timeout;
   final CacheProvider _cacheProvider;
   ActionExecutor(this._descriptor, this._globalErrorSink, this._timeout,
       this._cacheProvider);
-
-  TAction get _action => _descriptor._action;
-  StreamController<Tuple2<Channel, TResult?>> get _pipeline => _action.pipeline;
 
   ActionExecutor<TParam, TResult, TAction> when(bool Function() test,
       Function(ActionExecutor<TParam, TResult, TAction>) executor) {
@@ -44,6 +44,44 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
     return this;
   }
 
+  void echo(
+      {required TResult value,
+      Function? begin,
+      Function(bool)? end,
+      Channel Function(TAction)? channel});
+
+  void drain(
+      {TParam? param,
+      Function? begin,
+      Function(bool)? end,
+      Channel Function(TAction)? channel,
+      List<EventSink> Function(EventSink global, EventSink pipeline)?
+          errorSinks,
+      Duration? timeout});
+
+  void go(
+      {TParam? param,
+      Function? begin,
+      Function(bool)? end,
+      Channel Function(TAction)? channel,
+      CacheStrategy? cacheStrategy,
+      List<EventSink> Function(EventSink global, EventSink pipeline)?
+          errorSinks,
+      Duration? timeout});
+
+  Stream<TResult?> map({Channel Function(TAction)? channel});
+}
+
+class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
+    extends ActionExecutor<TParam, TResult, TAction> {
+  _ActionExecutor(ActionDescriptor<TAction, TParam, TResult> descriptor,
+      EventSink globalErrorSink, Duration timeout, CacheProvider cacheProvider)
+      : super(descriptor, globalErrorSink, timeout, cacheProvider);
+
+  TAction get _action => _descriptor._action;
+  StreamController<Tuple2<Channel, TResult?>> get _pipeline => _action.pipeline;
+
+  @override
   void echo(
           {required TResult value,
           Function? begin,
@@ -55,6 +93,7 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
           end: end,
           channel: channel);
 
+  @override
   void drain(
           {TParam? param,
           Function? begin,
@@ -72,6 +111,7 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
           timeout: timeout,
           subscribable: false);
 
+  @override
   void go(
           {TParam? param,
           Function? begin,
@@ -89,6 +129,16 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
           cacheStrategy: cacheStrategy,
           errorSinks: errorSinks,
           timeout: timeout);
+
+  @override
+  Stream<TResult?> map({Channel Function(TAction)? channel}) {
+    final channels = _getChannel(channel).ids.toSet();
+    // Map the selected channel and pipeline of actions.
+    final source = _pipeline.stream
+        .where((x) => x.item1.ids.toSet().intersection(channels).isNotEmpty)
+        .map<TResult?>((x) => x.item2);
+    return source.map((x) => x is Cloneable ? x.clone() : x);
+  }
 
   void _dispatch(
       {TParam? param,
@@ -113,17 +163,23 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
         throw ArgumentError.notNull('action parameter');
       }
 
+      if (_descriptor.alias?.isEmpty ?? true) {
+        throw Exception('An alias must be set.');
+      }
+
       StreamSubscription? temporalSubscription;
       final channel$ = _getChannel(channel);
 
       // Emit the executed result of the action to the selected channel.
       temporalSubscription = (result ??
-              await _cacheProvider.readCache(_action, cacheStrategy, param))
+              await _cacheProvider.readCache(
+                  _descriptor.alias!, _action.process, cacheStrategy, param))
           .timeout(timeout ?? _timeout)
           .transform<Tuple2<Channel, TResult?>>(
               StreamTransformer.fromHandlers(handleData: (data, sink) {
             sink.add(Tuple2(channel$, data));
-            _cacheProvider.writeCache(_action, cacheStrategy, data, param);
+            _cacheProvider.writeCache(
+                _descriptor.alias!, cacheStrategy, data, param);
           }, handleError: (error, stackTrace, sink) {
             final transformedResult = _action.transform(error);
             if (transformedResult != null) {
@@ -171,13 +227,4 @@ class ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>> {
   /// If no channel is specified, the default channel is selected.
   Channel _getChannel([Channel Function(TAction)? channel]) =>
       channel?.call(_action) ?? _action.defaultChannel;
-
-  Stream<TResult?> map({Channel Function(TAction)? channel}) {
-    final channels = _getChannel(channel).ids.toSet();
-    // Map the selected channel and pipeline of actions.
-    final source = _pipeline.stream
-        .where((x) => x.item1.ids.toSet().intersection(channels).isNotEmpty)
-        .map<TResult?>((x) => x.item2);
-    return source.map((x) => x is Cloneable ? x.clone() : x);
-  }
 }
