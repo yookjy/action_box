@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:action_box/action_box.dart';
 
+import 'list_to_tuple.dart';
 import 'string_to_char.dart';
 import 'string_to_list.dart';
 
@@ -53,4 +54,8 @@ class _ValueConverter extends ActionDirectory {
 
   ActionDescriptor<StringToChar, String, String> get getStringToCharValue =>
       putIfAbsentDescriptor('getStringToCharValue', () => StringToChar());
+
+  ActionDescriptor<ListToTuple, List<String>, Tuple3<String, String, String>?>
+      get getListToTupleValue =>
+          putIfAbsentDescriptor('getListToTupleValue', () => ListToTuple());
 }

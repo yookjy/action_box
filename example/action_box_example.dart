@@ -52,6 +52,10 @@ void main() async {
     result?.forEach((v) => print(v));
   }).disposedBy(bag);
 
+  actionBox((a) => a.valueConverter.getListToTupleValue).map().listen((result) {
+    print(result);
+  }).disposedBy(bag);
+
   //request data
   actionBox((a) => a.valueConverter.getStringToListValue).go(
       channel: (c) => c.ch1,
@@ -62,28 +66,40 @@ void main() async {
       end: (success) {/* after dispatching */},
       timeout: Duration(seconds: 10));
 
-  await Future.delayed(Duration(seconds: 1));
-
-  actionBox((a) => a.valueConverter.getStringToListValue).go(
-      channel: (c) => c.ch1,
-      param: 'value',
-      cacheStrategy: const CacheStrategy.file(Duration(minutes: 2),
-          codec: JsonCodec(reviver: Revivers.stringArr)),
-      begin: () {/* before dispatching */},
-      end: (success) {/* after dispatching */},
+  actionBox((a) => a.valueConverter.getListToTupleValue).go(
+      param: ['apple', 'graph', 'orange', 'strawberry'],
+      cacheStrategy: const CacheStrategy.file(Duration(minutes: 5),
+          codec: JsonCodec(reviver: Revivers.stringTuple3)),
       timeout: Duration(seconds: 10));
 
-  actionBox((a) => a.valueConverter.getStringToListValue)
-      .when(() => true, (a) => a.echo(value: ['e', 'c', 'h', 'o']))
-      .when(() => true, (a) => a.echo(value: null))
-      .when(() => true, (a) => a.drain(param: 'ignore'))
-      .go(param: 'real value');
+  await Future.delayed(Duration(seconds: 1));
 
-  actionBox((a) => a.valueConverter.getStringToListValue).drain(
-      param: 'waste',
-      end: (success) {
-        print(success);
-      });
+  // actionBox((a) => a.valueConverter.getStringToListValue).go(
+  //     channel: (c) => c.ch1,
+  //     param: 'value',
+  //     cacheStrategy: const CacheStrategy.file(Duration(minutes: 2),
+  //         codec: JsonCodec(reviver: Revivers.stringArr)),
+  //     begin: () {/* before dispatching */},
+  //     end: (success) {/* after dispatching */},
+  //     timeout: Duration(seconds: 10));
+
+  actionBox((a) => a.valueConverter.getListToTupleValue).go(
+      param: ['apple', 'graph', 'orange', 'strawberry'],
+      cacheStrategy: const CacheStrategy.file(Duration(minutes: 5),
+          codec: JsonCodec(reviver: Revivers.stringTuple3)),
+      timeout: Duration(seconds: 10));
+
+  // actionBox((a) => a.valueConverter.getStringToListValue)
+  //     .when(() => true, (a) => a.echo(value: ['e', 'c', 'h', 'o']))
+  //     .when(() => true, (a) => a.echo(value: null))
+  //     .when(() => true, (a) => a.drain(param: 'ignore'))
+  //     .go(param: 'real value');
+  //
+  // actionBox((a) => a.valueConverter.getStringToListValue).drain(
+  //     param: 'waste',
+  //     end: (success) {
+  //       print(success);
+  //     });
 
   var errStream = StreamController()..disposedBy(bag);
   errStream.stream.listen((event) {
@@ -97,7 +113,7 @@ void main() async {
   });
 
   actionBox((a) => a.valueConverter.getStringToCharValue).go(
-      param: 'This is iterable stream test!',
+      param: 'This is test for iterable stream!',
       errorSinks: (global, pipeline) => [global, pipeline, errStream]);
 
   await Future.delayed(Duration(seconds: 5));
@@ -110,8 +126,15 @@ void main() async {
 
 class Revivers {
   static Object stringArr(k, v) {
-    if (v is List) {
+    if (k == null && v is List) {
       return v.cast<String>().toList();
+    }
+    return v;
+  }
+
+  static Object stringTuple3(k, v) {
+    if (k == null && v is Map) {
+      return Tuple3<String, String, String>.fromMap(v);
     }
     return v;
   }
