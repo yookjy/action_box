@@ -120,7 +120,7 @@ class _FileCache extends FileCache {
 
     var cacheFileName = UUID.v4();
     indexGroup[indexName] = index;
-    index['expire'] = DateTime.now().add(strategy.expire).toIso8601String();
+    index['expire'] = DateTime.now().add(strategy.duration).toIso8601String();
     index['cache_name'] = cacheFileName;
 
     _spawn(

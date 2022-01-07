@@ -26,6 +26,10 @@ abstract class ActionBoxBase<TActionDirectory extends ActionDirectory> {
         _errorStreamFactory = errorStreamFactory,
         _cacheProvider = CacheProvider(cacheStorages ?? []);
 
+  void clearCache() {
+    _cacheProvider.clear();
+  }
+
   void dispose() {
     _root.dispose();
     _errorStreamController.close();

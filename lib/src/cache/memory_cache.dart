@@ -45,7 +45,7 @@ class _MemoryCache extends MemoryCache {
     try {
       _cacheTable[id] = {
         'param@${Uri.encodeFull(json.encode(param))}': {
-          'expire': DateTime.now().add(strategy.expire),
+          'expire': DateTime.now().add(strategy.duration),
           'data': data
         }
       };
