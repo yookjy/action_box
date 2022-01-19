@@ -10,8 +10,9 @@ class StringToList extends Action<String, List<String>?> {
   Stream<List<String>?> process([String? param]) {
     var list = <String>[];
     if (param != null && param.isNotEmpty) {
+      if (param == 'error') return Stream.error(Exception('error'));
       for (var i = 0; i < param.length; i++) {
-        // return Stream.error(Exception('error'));
+        //return Stream.error(Exception('error'));
         list.add(param[i]);
       }
     }

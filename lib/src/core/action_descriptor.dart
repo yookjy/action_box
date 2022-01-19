@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:action_box/src/cache/cache_provider.dart';
 import 'package:action_box/src/cache/cache_strategy.dart';
 import 'package:action_box/src/core/action.dart';
+import 'package:action_box/src/core/action_error.dart';
 import 'package:action_box/src/core/channel.dart';
 import 'package:action_box/src/utils/cloneable.dart';
 import 'package:action_box/src/utils/disposable.dart';
@@ -30,10 +31,10 @@ class ActionDescriptor<TAction extends Action<TParam, TResult>, TParam, TResult>
 abstract class ActionExecutor<TParam, TResult,
     TAction extends Action<TParam, TResult>> {
   final ActionDescriptor<TAction, TParam, TResult> _descriptor;
-  final EventSink _globalErrorSink;
+  final EventSink _universalStreamSink;
   final Duration _timeout;
   final CacheProvider _cacheProvider;
-  ActionExecutor(this._descriptor, this._globalErrorSink, this._timeout,
+  ActionExecutor(this._descriptor, this._universalStreamSink, this._timeout,
       this._cacheProvider);
 
   ActionExecutor<TParam, TResult, TAction> when(bool Function() test,
@@ -55,7 +56,7 @@ abstract class ActionExecutor<TParam, TResult,
       Function? begin,
       Function(bool)? end,
       Channel Function(TAction)? channel,
-      List<EventSink> Function(EventSink global, EventSink pipeline)?
+      List<EventSink> Function(EventSink universal, EventSink pipeline)?
           errorSinks,
       Duration? timeout});
 
@@ -65,7 +66,7 @@ abstract class ActionExecutor<TParam, TResult,
       Function(bool)? end,
       Channel Function(TAction)? channel,
       CacheStrategy? cacheStrategy,
-      List<EventSink> Function(EventSink global, EventSink pipeline)?
+      List<EventSink> Function(EventSink universal, EventSink pipeline)?
           errorSinks,
       Duration? timeout});
 
@@ -74,9 +75,12 @@ abstract class ActionExecutor<TParam, TResult,
 
 class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
     extends ActionExecutor<TParam, TResult, TAction> {
-  _ActionExecutor(ActionDescriptor<TAction, TParam, TResult> descriptor,
-      EventSink globalErrorSink, Duration timeout, CacheProvider cacheProvider)
-      : super(descriptor, globalErrorSink, timeout, cacheProvider);
+  _ActionExecutor(
+      ActionDescriptor<TAction, TParam, TResult> descriptor,
+      EventSink universalStreamSink,
+      Duration timeout,
+      CacheProvider cacheProvider)
+      : super(descriptor, universalStreamSink, timeout, cacheProvider);
 
   TAction get _action => _descriptor._action;
   StreamController<Tuple2<Channel, TResult?>> get _pipeline => _action.pipeline;
@@ -99,7 +103,7 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
           Function? begin,
           Function(bool)? end,
           Channel Function(TAction)? channel,
-          List<EventSink> Function(EventSink global, EventSink pipeline)?
+          List<EventSink> Function(EventSink universal, EventSink pipeline)?
               errorSinks,
           Duration? timeout}) =>
       _dispatch(
@@ -118,7 +122,7 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
           Function(bool)? end,
           Channel Function(TAction)? channel,
           CacheStrategy? cacheStrategy,
-          List<EventSink> Function(EventSink global, EventSink pipeline)?
+          List<EventSink> Function(EventSink universal, EventSink pipeline)?
               errorSinks,
           Duration? timeout}) =>
       _dispatch(
@@ -134,9 +138,19 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
   Stream<TResult?> map({Channel Function(TAction)? channel}) {
     final channels = _getChannel(channel).ids.toSet();
     // Map the selected channel and pipeline of actions.
+    bool validateChannels(Channel ch) =>
+        ch.ids.toSet().intersection(channels).isNotEmpty;
+
     final source = _pipeline.stream
-        .where((x) => x.item1.ids.toSet().intersection(channels).isNotEmpty)
-        .map<TResult?>((x) => x.item2);
+        .where((x) => validateChannels(x.item1))
+        .handleError((e) {
+      //If the channel does not match, it is ignored.
+    }, test: (e) {
+      if (e is ActionError && validateChannels(e.channel)) {
+        return false;
+      }
+      return true;
+    }).map<TResult?>((x) => x.item2);
     return source.map((x) => x is Cloneable ? x.clone() : x);
   }
 
@@ -147,13 +161,22 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
       Function(bool)? end,
       Channel Function(TAction)? channel,
       CacheStrategy? cacheStrategy,
-      List<EventSink> Function(EventSink global, EventSink pipeline)?
+      List<EventSink> Function(EventSink universal, EventSink pipeline)?
           errorSinks,
       Duration? timeout,
       bool subscribable = true}) async {
     var done = false;
-    var errorStreamSinks = errorSinks?.call(_globalErrorSink, _pipeline) ??
-        (subscribable ? [_pipeline] : [_globalErrorSink]);
+    var errorStreamSinks = errorSinks?.call(_universalStreamSink, _pipeline) ??
+        (subscribable ? [_pipeline] : [_universalStreamSink]);
+    final channel$ = _getChannel(channel);
+
+    void _addError(Object error, [StackTrace? stackTrace]) {
+      errorStreamSinks
+          .where((sink) => subscribable || (sink != _pipeline))
+          .forEach((sink) {
+        sink.addError(ActionError(error, channel$), stackTrace);
+      });
+    }
 
     try {
       begin?.call();
@@ -168,8 +191,6 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
       }
 
       StreamSubscription? temporalSubscription;
-      final channel$ = _getChannel(channel);
-
       // Emit the executed result of the action to the selected channel.
       temporalSubscription = (result ??
               await _cacheProvider.readCache(
@@ -196,31 +217,14 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
           // ignore
         }
       }, onError: (error, stackTrace) {
-        errorStreamSinks
-            .where((sink) => subscribable || (sink != _pipeline))
-            .forEach((sink) {
-          var err = stackTrace == null ? error : Tuple2(error, stackTrace);
-          _addError(sink, err);
-        });
+        _addError(error, stackTrace);
       }, onDone: () {
         end?.call(done);
         temporalSubscription?.cancel();
       });
-    } catch (error) {
-      errorStreamSinks
-          .where((sink) => subscribable || (sink != _pipeline))
-          .forEach((sink) {
-        _addError(sink, error);
-      });
+    } catch (error, stackTrace) {
+      _addError(error, stackTrace);
       end?.call(done);
-    }
-  }
-
-  void _addError(EventSink eventSink, Object error) {
-    if (eventSink == _pipeline) {
-      eventSink.addError(error);
-    } else {
-      eventSink.add(error);
     }
   }
 

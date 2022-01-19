@@ -9,21 +9,21 @@ import 'package:action_box/src/core/action_directory.dart';
 abstract class ActionBoxBase<TActionDirectory extends ActionDirectory> {
   late final TActionDirectory _root = _rootFactory.call();
   late final TActionDirectory Function() _rootFactory;
-  late final StreamController _errorStreamController =
-      _errorStreamFactory?.call() ?? StreamController.broadcast();
+  late final StreamController _universalStreamController =
+      _universalStreamFactory?.call() ?? StreamController.broadcast();
   final CacheProvider _cacheProvider;
-  final StreamController Function()? _errorStreamFactory;
+  final StreamController Function()? _universalStreamFactory;
 
   final Duration _defaultTimeout;
 
-  Stream get exceptionStream => _errorStreamController.stream;
+  Stream get universalStream => _universalStreamController.stream;
 
   ActionBoxBase(this._rootFactory,
       {Duration? defaultTimeout,
-      StreamController Function()? errorStreamFactory,
+      StreamController Function()? universalStreamFactory,
       List<CacheStorage?>? cacheStorages})
       : _defaultTimeout = defaultTimeout ?? const Duration(seconds: 3),
-        _errorStreamFactory = errorStreamFactory,
+        _universalStreamFactory = universalStreamFactory,
         _cacheProvider = CacheProvider(cacheStorages ?? []);
 
   void clearCache() {
@@ -32,7 +32,7 @@ abstract class ActionBoxBase<TActionDirectory extends ActionDirectory> {
 
   void dispose() {
     _root.dispose();
-    _errorStreamController.close();
+    _universalStreamController.close();
     _cacheProvider.dispose();
   }
 
@@ -42,6 +42,6 @@ abstract class ActionBoxBase<TActionDirectory extends ActionDirectory> {
               action) {
     var descriptor = action(_root);
     return descriptor.call(
-        _errorStreamController, _defaultTimeout, _cacheProvider);
+        _universalStreamController, _defaultTimeout, _cacheProvider);
   }
 }

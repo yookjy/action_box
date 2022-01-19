@@ -17,7 +17,7 @@ import 'action_box.dart';
     generateSourceDir: ['lib', 'example']) //optional
 final actionBox = ActionBox.shared(
     // You can use rx dart's operator to avoid duplication of errors.
-    // errorStreamFactory: () => PublishSubject()
+    // universalStreamFactory: () => PublishSubject()
     // ..bufferTime(Duration(milliseconds: 500))
     //   .where((x) => x.isNotEmpty)
     //   .flatMap((x) =>
@@ -26,8 +26,10 @@ final actionBox = ActionBox.shared(
       MemoryCache.create(),
       FileCache.fromPath(Directory.current.path)
     ])
-  ..exceptionStream.listen((event) {
-    print('global error handler => $event');
+  ..universalStream.listen((event) {
+    print('global data listener => $event');
+  }, onError: (error, stackTrace) {
+    print('global error handler => $error');
   });
 
 void main() async {
@@ -38,18 +40,23 @@ void main() async {
       .map(channel: (a) => a.ch1)
       .listen((result) {
     result?.forEach((v) => print(v));
+  }, onError: (e) {
+    print('error $e');
   }).disposedBy(bag);
   //
   actionBox((a) => a.valueConverter.getStringToListValue)
       .map(channel: (a) => a.ch1 | a.defaultChannel)
       .listen((result) {
     result?.forEach((v) => print(v));
+  }, onError: (e) {
+    print('error $e');
   }).disposedBy(bag);
 
-  actionBox((a) => a.valueConverter.getStringToListValue)
-      .map(channel: (a) => a.ch1)
-      .listen((result) {
+  actionBox((a) => a.valueConverter.getStringToListValue).map().listen(
+      (result) {
     result?.forEach((v) => print(v));
+  }, onError: (e) {
+    print('error $e');
   }).disposedBy(bag);
 
   actionBox((a) => a.valueConverter.getListToTupleValue).map().listen((result) {
@@ -74,14 +81,14 @@ void main() async {
 
   await Future.delayed(Duration(seconds: 1));
 
-  // actionBox((a) => a.valueConverter.getStringToListValue).go(
-  //     channel: (c) => c.ch1,
-  //     param: 'value',
-  //     cacheStrategy: const CacheStrategy.file(Duration(minutes: 2),
-  //         codec: JsonCodec(reviver: Revivers.stringArr)),
-  //     begin: () {/* before dispatching */},
-  //     end: (success) {/* after dispatching */},
-  //     timeout: Duration(seconds: 10));
+  actionBox((a) => a.valueConverter.getStringToListValue).go(
+      channel: (c) => c.ch1,
+      param: 'value',
+      cacheStrategy: const CacheStrategy.file(Duration(minutes: 2),
+          codec: JsonCodec(reviver: Revivers.stringArr)),
+      begin: () {/* before dispatching */},
+      end: (success) {/* after dispatching */},
+      timeout: Duration(seconds: 10));
 
   actionBox((a) => a.valueConverter.getListToTupleValue).go(
       param: ['apple', 'graph', 'orange', 'strawberry'],
@@ -89,21 +96,23 @@ void main() async {
           codec: JsonCodec(reviver: Revivers.stringTuple3)),
       timeout: Duration(seconds: 10));
 
-  // actionBox((a) => a.valueConverter.getStringToListValue)
-  //     .when(() => true, (a) => a.echo(value: ['e', 'c', 'h', 'o']))
-  //     .when(() => true, (a) => a.echo(value: null))
-  //     .when(() => true, (a) => a.drain(param: 'ignore'))
-  //     .go(param: 'real value');
-  //
-  // actionBox((a) => a.valueConverter.getStringToListValue).drain(
-  //     param: 'waste',
-  //     end: (success) {
-  //       print(success);
-  //     });
+  actionBox((a) => a.valueConverter.getStringToListValue)
+      .when(() => true, (a) => a.echo(value: ['e', 'c', 'h', 'o']))
+      .when(() => true, (a) => a.echo(value: null))
+      .when(() => true, (a) => a.drain(param: 'ignore'))
+      .go(param: 'real value');
+
+  actionBox((a) => a.valueConverter.getStringToListValue).drain(
+      param: 'waste',
+      end: (success) {
+        print(success);
+      });
 
   var errStream = StreamController()..disposedBy(bag);
   errStream.stream.listen((event) {
     print('local => $event');
+  }, onError: (error, stackTrace) {
+    print('local => $error \n $stackTrace');
   }).disposedBy(bag);
 
   actionBox((a) => a.valueConverter.getStringToCharValue).map().listen((v) {
@@ -114,7 +123,7 @@ void main() async {
 
   actionBox((a) => a.valueConverter.getStringToCharValue).go(
       param: 'This is test for iterable stream!',
-      errorSinks: (global, pipeline) => [global, pipeline, errStream]);
+      errorSinks: (universal, pipeline) => [universal, pipeline, errStream]);
 
   await Future.delayed(Duration(seconds: 5));
   //call dispose method when completed

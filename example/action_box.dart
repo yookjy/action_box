@@ -8,19 +8,19 @@ import 'string_to_list.dart';
 
 class ActionBox extends ActionBoxBase<_ActionRoot> {
   static ActionBox? _instance;
-  ActionBox._(StreamController<dynamic> Function()? errorStreamFactory,
+  ActionBox._(StreamController<dynamic> Function()? universalStreamFactory,
       Duration? defaultTimeout, List<CacheStorage>? cacheStorages)
       : super(() => _ActionRoot(),
-            errorStreamFactory: errorStreamFactory,
+            universalStreamFactory: universalStreamFactory,
             defaultTimeout: defaultTimeout,
             cacheStorages: cacheStorages);
 
   factory ActionBox.shared(
-          {StreamController<dynamic> Function()? errorStreamFactory,
+          {StreamController<dynamic> Function()? universalStreamFactory,
           Duration? defaultTimeout,
           List<CacheStorage>? cacheStorages}) =>
       _instance ??=
-          ActionBox._(errorStreamFactory, defaultTimeout, cacheStorages);
+          ActionBox._(universalStreamFactory, defaultTimeout, cacheStorages);
 
   @override
   void dispose() {
