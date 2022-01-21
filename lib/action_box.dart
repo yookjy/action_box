@@ -11,6 +11,7 @@ export 'src/cache/memory_cache.dart';
 export 'src/core/action.dart';
 export 'src/core/action_descriptor.dart';
 export 'src/core/action_directory.dart';
+export 'src/core/action_error.dart';
 export 'src/core/transformed_result.dart';
 export 'src/annotation/action_box_config.dart';
 export 'src/annotation/action_config.dart';

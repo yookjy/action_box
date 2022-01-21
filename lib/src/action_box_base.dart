@@ -5,6 +5,7 @@ import 'package:action_box/src/cache/cache_storage.dart';
 import 'package:action_box/src/core/action.dart';
 import 'package:action_box/src/core/action_descriptor.dart';
 import 'package:action_box/src/core/action_directory.dart';
+import 'package:action_box/src/core/action_error.dart';
 
 abstract class ActionBoxBase<TActionDirectory extends ActionDirectory> {
   late final TActionDirectory _root = _rootFactory.call();
@@ -16,14 +17,19 @@ abstract class ActionBoxBase<TActionDirectory extends ActionDirectory> {
 
   final Duration _defaultTimeout;
 
+  final Function(ActionError, EventSink)? _handleError;
+
   Stream get universalStream => _universalStreamController.stream;
+  EventSink get universalSink => _universalStreamController.sink;
 
   ActionBoxBase(this._rootFactory,
       {Duration? defaultTimeout,
       StreamController Function()? universalStreamFactory,
+      Function(ActionError error, EventSink universalSink)? handleError,
       List<CacheStorage?>? cacheStorages})
       : _defaultTimeout = defaultTimeout ?? const Duration(seconds: 3),
         _universalStreamFactory = universalStreamFactory,
+        _handleError = handleError,
         _cacheProvider = CacheProvider(cacheStorages ?? []);
 
   void clearCache() {
@@ -42,6 +48,6 @@ abstract class ActionBoxBase<TActionDirectory extends ActionDirectory> {
               action) {
     var descriptor = action(_root);
     return descriptor.call(
-        _universalStreamController, _defaultTimeout, _cacheProvider);
+        _universalStreamController, _handleError, _defaultTimeout, _cacheProvider);
   }
 }

@@ -18,6 +18,8 @@ class DisposeBag extends Disposable {
         pair.value.dispose();
       } else if (pair.value is StreamSubscription) {
         pair.value.cancel();
+      } else if (pair.value is EventSink) {
+        pair.value.close();
       } else if (pair.value is StreamSink) {
         pair.value.close();
       } else {

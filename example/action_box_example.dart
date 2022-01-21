@@ -22,6 +22,13 @@ final actionBox = ActionBox.shared(
     //   .where((x) => x.isNotEmpty)
     //   .flatMap((x) =>
     //   (x as PublishSubject<Object>).distinct((pre, cur) => pre == cur))
+    handleError: (error, universalSink) {
+      // if (error.innerError is Exception) {
+      //   universalSink.add('convert error to global data');
+      //   error.handled = true;
+      //   //return true;
+      // }
+    },
     cacheStorages: [
       MemoryCache.create(),
       FileCache.fromPath(Directory.current.path)
@@ -123,7 +130,10 @@ void main() async {
 
   actionBox((a) => a.valueConverter.getStringToCharValue).go(
       param: 'This is test for iterable stream!',
-      errorSinks: (universal, pipeline) => [universal, pipeline, errStream]);
+      handleError: (error, stackTrace) {
+        errStream.addError(error.innerError, stackTrace);
+        error.handled = true;
+      });
 
   await Future.delayed(Duration(seconds: 5));
   //call dispose method when completed

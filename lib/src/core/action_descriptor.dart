@@ -23,18 +23,20 @@ class ActionDescriptor<TAction extends Action<TParam, TResult>, TParam, TResult>
     _action.dispose();
   }
 
-  ActionExecutor<TParam, TResult, TAction> call(EventSink errorSink,
+  ActionExecutor<TParam, TResult, TAction> call(EventSink universalStreamSink,
+    Function(ActionError, EventSink)? handleError,
           Duration defaultTimeout, CacheProvider cacheProvider) =>
-      _ActionExecutor(this, errorSink, defaultTimeout, cacheProvider);
+      _ActionExecutor(this, universalStreamSink, handleError, defaultTimeout, cacheProvider);
 }
 
 abstract class ActionExecutor<TParam, TResult,
     TAction extends Action<TParam, TResult>> {
   final ActionDescriptor<TAction, TParam, TResult> _descriptor;
   final EventSink _universalStreamSink;
+  final Function(ActionError, EventSink)? _handleError;
   final Duration _timeout;
   final CacheProvider _cacheProvider;
-  ActionExecutor(this._descriptor, this._universalStreamSink, this._timeout,
+  ActionExecutor(this._descriptor, this._universalStreamSink, this._handleError, this._timeout,
       this._cacheProvider);
 
   ActionExecutor<TParam, TResult, TAction> when(bool Function() test,
@@ -54,10 +56,9 @@ abstract class ActionExecutor<TParam, TResult,
   void drain(
       {TParam? param,
       Function? begin,
-      Function(bool)? end,
-      Channel Function(TAction)? channel,
-      List<EventSink> Function(EventSink universal, EventSink pipeline)?
-          errorSinks,
+      Function(bool success)? end,
+      Channel Function(TAction action)? channel,
+      Function(ActionError error, StackTrace? stackTrace)? handleError,
       Duration? timeout});
 
   void go(
@@ -66,8 +67,7 @@ abstract class ActionExecutor<TParam, TResult,
       Function(bool)? end,
       Channel Function(TAction)? channel,
       CacheStrategy? cacheStrategy,
-      List<EventSink> Function(EventSink universal, EventSink pipeline)?
-          errorSinks,
+      Function(ActionError error, StackTrace? stackTrace)? handleError,
       Duration? timeout});
 
   Stream<TResult?> map({Channel Function(TAction)? channel});
@@ -78,9 +78,10 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
   _ActionExecutor(
       ActionDescriptor<TAction, TParam, TResult> descriptor,
       EventSink universalStreamSink,
+      Function(ActionError, EventSink)? handleError,
       Duration timeout,
       CacheProvider cacheProvider)
-      : super(descriptor, universalStreamSink, timeout, cacheProvider);
+      : super(descriptor, universalStreamSink, handleError, timeout, cacheProvider);
 
   TAction get _action => _descriptor._action;
   StreamController<Tuple2<Channel, TResult?>> get _pipeline => _action.pipeline;
@@ -89,8 +90,8 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
   void echo(
           {required TResult value,
           Function? begin,
-          Function(bool)? end,
-          Channel Function(TAction)? channel}) =>
+          Function(bool success)? end,
+          Channel Function(TAction action)? channel}) =>
       _dispatch(
           result: Stream.value(value),
           begin: begin,
@@ -101,17 +102,16 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
   void drain(
           {TParam? param,
           Function? begin,
-          Function(bool)? end,
-          Channel Function(TAction)? channel,
-          List<EventSink> Function(EventSink universal, EventSink pipeline)?
-              errorSinks,
+          Function(bool success)? end,
+          Channel Function(TAction action)? channel,
+          Function(ActionError error, StackTrace? stackTrace)? handleError,
           Duration? timeout}) =>
       _dispatch(
           param: param,
           begin: begin,
           end: end,
           channel: channel,
-          errorSinks: errorSinks,
+          handleError: handleError,
           timeout: timeout,
           subscribable: false);
 
@@ -119,11 +119,10 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
   void go(
           {TParam? param,
           Function? begin,
-          Function(bool)? end,
-          Channel Function(TAction)? channel,
+          Function(bool success)? end,
+          Channel Function(TAction action)? channel,
           CacheStrategy? cacheStrategy,
-          List<EventSink> Function(EventSink universal, EventSink pipeline)?
-              errorSinks,
+          Function(ActionError error, StackTrace? stackTrace)? handleError,
           Duration? timeout}) =>
       _dispatch(
           param: param,
@@ -131,7 +130,7 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
           end: end,
           channel: channel,
           cacheStrategy: cacheStrategy,
-          errorSinks: errorSinks,
+          handleError: handleError,
           timeout: timeout);
 
   @override
@@ -161,21 +160,24 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
       Function(bool)? end,
       Channel Function(TAction)? channel,
       CacheStrategy? cacheStrategy,
-      List<EventSink> Function(EventSink universal, EventSink pipeline)?
-          errorSinks,
+      Function(ActionError error, StackTrace? stackTrace)? handleError,
       Duration? timeout,
       bool subscribable = true}) async {
     var done = false;
-    var errorStreamSinks = errorSinks?.call(_universalStreamSink, _pipeline) ??
-        (subscribable ? [_pipeline] : [_universalStreamSink]);
     final channel$ = _getChannel(channel);
 
-    void _addError(Object error, [StackTrace? stackTrace]) {
-      errorStreamSinks
-          .where((sink) => subscribable || (sink != _pipeline))
-          .forEach((sink) {
-        sink.addError(ActionError(error, channel$), stackTrace);
-      });
+    void _addError(Object error, StackTrace? stackTrace) {
+      var actionError = ActionError(error, channel$);
+      // handle error as universal stream
+      _handleError?.call(actionError, _universalStreamSink);
+      if (!actionError.handled) {
+        // handle error by caller
+        handleError?.call(actionError, stackTrace);
+        if (subscribable && !actionError.handled) {
+          // emit error to pipeline
+          _pipeline.addError(actionError, stackTrace);
+        }
+      }
     }
 
     try {
