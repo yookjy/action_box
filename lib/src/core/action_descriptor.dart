@@ -23,21 +23,24 @@ class ActionDescriptor<TAction extends Action<TParam, TResult>, TParam, TResult>
     _action.dispose();
   }
 
-  ActionExecutor<TParam, TResult, TAction> call(EventSink universalStreamSink,
-    Function(ActionError, EventSink)? handleError,
-          Duration defaultTimeout, CacheProvider cacheProvider) =>
-      _ActionExecutor(this, universalStreamSink, handleError, defaultTimeout, cacheProvider);
+  ActionExecutor<TParam, TResult, TAction> call(
+          EventSink universalStreamSink,
+          Function(ActionError, EventSink)? handleCommonError,
+          Duration defaultTimeout,
+          CacheProvider cacheProvider) =>
+      _ActionExecutor(this, universalStreamSink, handleCommonError,
+          defaultTimeout, cacheProvider);
 }
 
 abstract class ActionExecutor<TParam, TResult,
     TAction extends Action<TParam, TResult>> {
   final ActionDescriptor<TAction, TParam, TResult> _descriptor;
   final EventSink _universalStreamSink;
-  final Function(ActionError, EventSink)? _handleError;
+  final Function(ActionError, EventSink)? _handleCommonError;
   final Duration _timeout;
   final CacheProvider _cacheProvider;
-  ActionExecutor(this._descriptor, this._universalStreamSink, this._handleError, this._timeout,
-      this._cacheProvider);
+  ActionExecutor(this._descriptor, this._universalStreamSink,
+      this._handleCommonError, this._timeout, this._cacheProvider);
 
   ActionExecutor<TParam, TResult, TAction> when(bool Function() test,
       Function(ActionExecutor<TParam, TResult, TAction>) executor) {
@@ -81,7 +84,8 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
       Function(ActionError, EventSink)? handleError,
       Duration timeout,
       CacheProvider cacheProvider)
-      : super(descriptor, universalStreamSink, handleError, timeout, cacheProvider);
+      : super(descriptor, universalStreamSink, handleError, timeout,
+            cacheProvider);
 
   TAction get _action => _descriptor._action;
   StreamController<Tuple2<Channel, TResult?>> get _pipeline => _action.pipeline;
@@ -169,7 +173,7 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
     void _addError(Object error, StackTrace? stackTrace) {
       var actionError = ActionError(error, channel$);
       // handle error as universal stream
-      _handleError?.call(actionError, _universalStreamSink);
+      _handleCommonError?.call(actionError, _universalStreamSink);
       if (!actionError.handled) {
         // handle error by caller
         handleError?.call(actionError, stackTrace);

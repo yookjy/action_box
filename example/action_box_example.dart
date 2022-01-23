@@ -17,12 +17,12 @@ import 'action_box.dart';
     generateSourceDir: ['lib', 'example']) //optional
 final actionBox = ActionBox.shared(
     // You can use rx dart's operator to avoid duplication of errors.
-    // universalStreamFactory: () => PublishSubject()
+    // createUniversalStreamController: () => PublishSubject()
     // ..bufferTime(Duration(milliseconds: 500))
     //   .where((x) => x.isNotEmpty)
     //   .flatMap((x) =>
     //   (x as PublishSubject<Object>).distinct((pre, cur) => pre == cur))
-    handleError: (error, universalSink) {
+    handleCommonError: (error, universalSink) {
       // if (error.innerError is Exception) {
       //   universalSink.add('convert error to global data');
       //   error.handled = true;
