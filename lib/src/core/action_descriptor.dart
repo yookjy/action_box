@@ -81,10 +81,10 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
   _ActionExecutor(
       ActionDescriptor<TAction, TParam, TResult> descriptor,
       EventSink universalStreamSink,
-      Function(ActionError, EventSink)? handleError,
+      Function(ActionError error, EventSink eventSink)? handleCommonError,
       Duration timeout,
       CacheProvider cacheProvider)
-      : super(descriptor, universalStreamSink, handleError, timeout,
+      : super(descriptor, universalStreamSink, handleCommonError, timeout,
             cacheProvider);
 
   TAction get _action => _descriptor._action;
