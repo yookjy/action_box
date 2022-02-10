@@ -10,7 +10,7 @@ abstract class Action<TParam, TResult> implements Disposable {
 
   StreamController<Tuple2<Channel, TResult?>>? _pipeline;
   StreamController<Tuple2<Channel, TResult?>> get pipeline =>
-      _pipeline ?? (_pipeline = createPipeline());
+      _pipeline ??= createPipeline();
   StreamController<Tuple2<Channel, TResult?>> createPipeline() =>
       StreamController.broadcast();
 
