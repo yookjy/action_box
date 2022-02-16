@@ -61,9 +61,9 @@ class _FileCache extends FileCache {
   @override
   FutureOr<Stream<TResult>> readCache<TParam, TResult>(
       String id,
-      FutureOr<Stream<TResult>> Function([TParam?]) ifAbsent,
+      FutureOr<Stream<TResult>> Function(TParam) ifAbsent,
       CacheStrategy strategy,
-      TParam? param) async {
+      TParam param) async {
     var index = await _readIndex(
         id, _getIndexName(json.encode(param)), strategy, param);
     TResult? data;

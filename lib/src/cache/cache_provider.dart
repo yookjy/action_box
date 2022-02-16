@@ -11,9 +11,9 @@ class CacheProvider extends CacheStorage {
   @override
   FutureOr<Stream<TResult>> readCache<TParam, TResult>(
       String id,
-      FutureOr<Stream<TResult>> Function([TParam?]) ifAbsent,
+      FutureOr<Stream<TResult>> Function(TParam) ifAbsent,
       CacheStrategy? strategy,
-      TParam? param) {
+      TParam param) {
     CacheStorage? storage;
     if (strategy == null || (storage = _getStorage(strategy)) == null) {
       return ifAbsent(param);
@@ -24,7 +24,7 @@ class CacheProvider extends CacheStorage {
 
   @override
   void writeCache<TParam, TResult>(
-      String id, CacheStrategy? strategy, TResult data, TParam? param) {
+      String id, CacheStrategy? strategy, TResult data, TParam param) {
     if (strategy != null) {
       _getStorage(strategy)?.writeCache(id, strategy, data, param);
     }

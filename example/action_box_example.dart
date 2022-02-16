@@ -43,13 +43,13 @@ void main() async {
   var bag = DisposeBag();
 
   //receive result
-  actionBox((a) => a.valueConverter.getStringToListValue)
-      .map(channel: (a) => a.ch1)
-      .listen((result) {
-    result?.forEach((v) => print(v));
-  }, onError: (e) {
-    print('error $e');
-  }).disposedBy(bag);
+  // actionBox((a) => a.valueConverter.getStringToListValue)
+  //     .map(channel: (a) => a.ch1)
+  //     .listen((result) {
+  //   result?.forEach((v) => print(v));
+  // }, onError: (e) {
+  //   print('error $e');
+  // }).disposedBy(bag);
   //
   actionBox((a) => a.valueConverter.getStringToListValue)
       .map(channel: (a) => a.ch1 | a.defaultChannel)
@@ -71,61 +71,61 @@ void main() async {
   }).disposedBy(bag);
 
   //request data
-  actionBox((a) => a.valueConverter.getStringToListValue).go(
-      channel: (c) => c.ch1,
-      param: 'value',
-      cacheStrategy: const CacheStrategy.file(Duration(minutes: 5),
-          codec: JsonCodec(reviver: Revivers.stringArr)),
-      begin: () {/* before dispatching */},
-      end: (success) {/* after dispatching */},
-      timeout: Duration(seconds: 10));
+  // actionBox((a) => a.valueConverter.getStringToListValue).go(
+  //     channel: (c) => c.ch1,
+  //     param: 'value',
+  //     cacheStrategy: const CacheStrategy.file(Duration(minutes: 5),
+  //         codec: JsonCodec(reviver: Revivers.stringArr)),
+  //     begin: () {/* before dispatching */},
+  //     end: (success) {/* after dispatching */},
+  //     timeout: Duration(seconds: 10));
+  //
+  // actionBox((a) => a.valueConverter.getListToTupleValue).go(
+  //     param: ['apple', 'graph', 'orange', 'strawberry'],
+  //     cacheStrategy: const CacheStrategy.file(Duration(minutes: 5),
+  //         codec: JsonCodec(reviver: Revivers.stringTuple3)),
+  //     timeout: Duration(seconds: 10));
 
-  actionBox((a) => a.valueConverter.getListToTupleValue).go(
-      param: ['apple', 'graph', 'orange', 'strawberry'],
-      cacheStrategy: const CacheStrategy.file(Duration(minutes: 5),
-          codec: JsonCodec(reviver: Revivers.stringTuple3)),
-      timeout: Duration(seconds: 10));
+  // await Future.delayed(Duration(seconds: 1));
+  //
+  // actionBox((a) => a.valueConverter.getStringToListValue).go(
+  //     channel: (c) => c.ch1,
+  //     param: 'value',
+  //     cacheStrategy: const CacheStrategy.file(Duration(minutes: 2),
+  //         codec: JsonCodec(reviver: Revivers.stringArr)),
+  //     begin: () {/* before dispatching */},
+  //     end: (success) {/* after dispatching */},
+  //     timeout: Duration(seconds: 10));
 
-  await Future.delayed(Duration(seconds: 1));
+  // actionBox((a) => a.valueConverter.getListToTupleValue).go(
+  //     param: ['apple', 'graph', 'orange', 'strawberry'],
+  //     cacheStrategy: const CacheStrategy.file(Duration(minutes: 5),
+  //         codec: JsonCodec(reviver: Revivers.stringTuple3)),
+  //     timeout: Duration(seconds: 10));
 
-  actionBox((a) => a.valueConverter.getStringToListValue).go(
-      channel: (c) => c.ch1,
-      param: 'value',
-      cacheStrategy: const CacheStrategy.file(Duration(minutes: 2),
-          codec: JsonCodec(reviver: Revivers.stringArr)),
-      begin: () {/* before dispatching */},
-      end: (success) {/* after dispatching */},
-      timeout: Duration(seconds: 10));
-
-  actionBox((a) => a.valueConverter.getListToTupleValue).go(
-      param: ['apple', 'graph', 'orange', 'strawberry'],
-      cacheStrategy: const CacheStrategy.file(Duration(minutes: 5),
-          codec: JsonCodec(reviver: Revivers.stringTuple3)),
-      timeout: Duration(seconds: 10));
-
-  actionBox((a) => a.valueConverter.getStringToListValue)
-      .when(() => true, (a) => a.echo(value: ['e', 'c', 'h', 'o']))
-      .when(() => true, (a) => a.echo(value: null))
-      .when(() => true, (a) => a.drain(param: 'ignore'))
-      .go(param: 'real value');
-
-  actionBox((a) => a.valueConverter.getStringToListValue).drain(
-      param: 'waste',
-      end: (success) {
-        print(success);
-      });
+  // actionBox((a) => a.valueConverter.getStringToListValue)
+  //     .when(() => true, (a) => a.echo(value: ['e', 'c', 'h', 'o']))
+  //     .when(() => true, (a) => a.echo(value: null))
+  //     .when(() => true, (a) => a.drain(param: 'ignore'))
+  //     .go(param: 'real value');
+  //
+  // actionBox((a) => a.valueConverter.getStringToListValue).drain(
+  //     param: 'waste',
+  //     end: (success) {
+  //       print(success);
+  //     });
 
   var errStream = StreamController()..disposedBy(bag);
   errStream.stream.listen((event) {
-    print('local => $event');
+    print('local onData => $event');
   }, onError: (error, stackTrace) {
-    print('local => $error \n $stackTrace');
+    print('local onError => $error \n $stackTrace');
   }).disposedBy(bag);
 
   actionBox((a) => a.valueConverter.getStringToCharValue).map().listen((v) {
     print(v);
-  }, onError: (error) {
-    print('onError => $error');
+  }, onError: (error, stackTrace) {
+    print('inline onError => $error \n $stackTrace');
   });
 
   actionBox((a) => a.valueConverter.getStringToCharValue).go(

@@ -16,9 +16,9 @@ class _MemoryCache extends MemoryCache {
   @override
   FutureOr<Stream<TResult>> readCache<TParam, TResult>(
       String id,
-      FutureOr<Stream<TResult>> Function([TParam?]) ifAbsent,
+      FutureOr<Stream<TResult>> Function(TParam) ifAbsent,
       CacheStrategy strategy,
-      TParam? param) {
+      TParam param) {
     if (_cacheTable.isNotEmpty && _cacheTable.containsKey(id)) {
       var cache = _cacheTable[id];
       var sectionKey = 'param@${Uri.encodeFull(json.encode(param))}';
