@@ -224,6 +224,7 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
         }
       }, onError: (error, stackTrace) {
         _addError(error, stackTrace);
+        end?.call(done);
       }, onDone: () {
         end?.call(done);
         temporalSubscription?.cancel();
