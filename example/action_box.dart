@@ -5,6 +5,7 @@ import 'package:action_box/action_box.dart';
 import 'list_to_tuple.dart';
 import 'string_to_char.dart';
 import 'string_to_list.dart';
+import 'string_to_nullable.dart';
 
 class ActionBox extends ActionBoxBase<_ActionRoot> {
   static ActionBox? _instance;
@@ -65,4 +66,8 @@ class _ValueConverter extends ActionDirectory {
   ActionDescriptor<ListToTuple, List<String>, Tuple3<String, String, String>?>
       get getListToTupleValue =>
           putIfAbsentDescriptor('getListToTupleValue', () => ListToTuple());
+
+  ActionDescriptor<StringToNullable, String, String?>
+      get getStringToNullableValue => putIfAbsentDescriptor(
+          'getStringToNullableValue', () => StringToNullable());
 }

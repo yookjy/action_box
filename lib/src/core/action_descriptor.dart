@@ -73,7 +73,7 @@ abstract class ActionExecutor<TParam, TResult,
       Function(ActionError error, StackTrace? stackTrace)? handleError,
       Duration? timeout});
 
-  Stream<TResult?> map({Channel Function(TAction)? channel});
+  Stream<TResult> map({Channel Function(TAction)? channel});
 }
 
 class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
@@ -88,7 +88,7 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
             cacheProvider);
 
   TAction get _action => _descriptor._action;
-  StreamController<Tuple2<Channel, TResult?>> get _pipeline => _action.pipeline;
+  StreamController<Tuple2<Channel, TResult>> get _pipeline => _action.pipeline;
 
   @override
   void echo(
@@ -138,7 +138,7 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
           timeout: timeout);
 
   @override
-  Stream<TResult?> map({Channel Function(TAction)? channel}) {
+  Stream<TResult> map({Channel Function(TAction)? channel}) {
     final channels = _getChannel(channel).ids.toSet();
     // Map the selected channel and pipeline of actions.
     bool validateChannels(Channel ch) =>
@@ -153,7 +153,7 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
         return false;
       }
       return true;
-    }).map<TResult?>((x) => x.item2);
+    }).map<TResult>((x) => x.item2);
     return source.map((x) => x is Cloneable ? x.clone() : x);
   }
 
@@ -202,7 +202,7 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
               await _cacheProvider.readCache(
                   _descriptor.alias!, _action._process, cacheStrategy, param))
           .timeout(timeout ?? _timeout)
-          .transform<Tuple2<Channel, TResult?>>(
+          .transform<Tuple2<Channel, TResult>>(
               StreamTransformer.fromHandlers(handleData: (data, sink) {
             sink.add(Tuple2(channel$, data));
             _cacheProvider.writeCache(

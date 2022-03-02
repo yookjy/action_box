@@ -70,6 +70,12 @@ void main() async {
     print(result);
   }).disposedBy(bag);
 
+  actionBox((a) => a.valueConverter.getStringToNullableValue)
+      .map()
+      .listen((result) {
+    print('nullable => $result');
+  }).disposedBy(bag);
+
   //request data
   // actionBox((a) => a.valueConverter.getStringToListValue).go(
   //     channel: (c) => c.ch1,
@@ -134,6 +140,8 @@ void main() async {
         errStream.addError(error.innerError, stackTrace);
         error.handled = true;
       });
+
+  actionBox((a) => a.valueConverter.getStringToNullableValue).go(param: '');
 
   await Future.delayed(Duration(seconds: 5));
   //call dispose method when completed
