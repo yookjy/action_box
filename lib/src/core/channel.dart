@@ -13,4 +13,9 @@ class Channel {
   Channel operator |(covariant Channel other) {
     return Channel._from(ids + other.ids);
   }
+
+  @override
+  String toString() {
+    return _ids.toString();
+  }
 }

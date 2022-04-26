@@ -11,11 +11,12 @@ import 'package:action_box/src/utils/tuple.dart';
 
 class ActionDescriptor<TAction extends Action<TParam, TResult>, TParam, TResult>
     implements Disposable {
-  final String _alias;
   final TAction Function() _factory;
   late final TAction _action = _factory();
 
-  ActionDescriptor(this._alias, this._factory);
+  String? alias;
+
+  ActionDescriptor(this._factory);
 
   @override
   FutureOr dispose() {
@@ -56,7 +57,7 @@ abstract class ActionExecutor<TParam, TResult,
       Channel Function(TAction)? channel});
 
   void drain(
-      {TParam? param,
+      {TParam param,
       Function? begin,
       Function(bool success)? end,
       Channel Function(TAction action)? channel,
@@ -64,7 +65,7 @@ abstract class ActionExecutor<TParam, TResult,
       Duration? timeout});
 
   void go(
-      {TParam? param,
+      {TParam param,
       Function? begin,
       Function(bool)? end,
       Channel Function(TAction)? channel,
@@ -72,7 +73,7 @@ abstract class ActionExecutor<TParam, TResult,
       Function(ActionError error, StackTrace? stackTrace)? handleError,
       Duration? timeout});
 
-  Stream<TResult?> map({Channel Function(TAction)? channel});
+  Stream<TResult> map({Channel Function(TAction)? channel});
 }
 
 class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
@@ -80,14 +81,14 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
   _ActionExecutor(
       ActionDescriptor<TAction, TParam, TResult> descriptor,
       EventSink universalStreamSink,
-      Function(ActionError, EventSink)? handleError,
+      Function(ActionError error, EventSink eventSink)? handleCommonError,
       Duration timeout,
       CacheProvider cacheProvider)
-      : super(descriptor, universalStreamSink, handleError, timeout,
+      : super(descriptor, universalStreamSink, handleCommonError, timeout,
             cacheProvider);
 
   TAction get _action => _descriptor._action;
-  StreamController<Tuple2<Channel, TResult?>> get _pipeline => _action.pipeline;
+  StreamController<Tuple2<Channel, TResult>> get _pipeline => _action.pipeline;
 
   @override
   void echo(
@@ -137,7 +138,7 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
           timeout: timeout);
 
   @override
-  Stream<TResult?> map({Channel Function(TAction)? channel}) {
+  Stream<TResult> map({Channel Function(TAction)? channel}) {
     final channels = _getChannel(channel).ids.toSet();
     // Map the selected channel and pipeline of actions.
     bool validateChannels(Channel ch) =>
@@ -152,7 +153,7 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
         return false;
       }
       return true;
-    }).map<TResult?>((x) => x.item2);
+    }).map<TResult>((x) => x.item2);
     return source.map((x) => x is Cloneable ? x.clone() : x);
   }
 
@@ -171,11 +172,11 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
 
     void _addError(Object error, StackTrace? stackTrace) {
       var actionError = ActionError(error, channel$);
-      // handle error as universal stream
-      _handleCommonError?.call(actionError, _universalStreamSink);
+      // handle error by caller
+      handleError?.call(actionError, stackTrace);
       if (!actionError.handled) {
-        // handle error by caller
-        handleError?.call(actionError, stackTrace);
+        // handle error as universal stream
+        _handleCommonError?.call(actionError, _universalStreamSink);
         if (subscribable && !actionError.handled) {
           // emit error to pipeline
           _pipeline.addError(actionError, stackTrace);
@@ -187,21 +188,25 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
       begin?.call();
 
       // validate mandatory parameter
-      if (result == null && !(null is TParam) && param == null) {
+      if (result == null && null is! TParam && param == null) {
         throw ArgumentError.notNull('action parameter');
+      }
+
+      if (_descriptor.alias?.isEmpty ?? true) {
+        throw Exception('An alias must be set.');
       }
 
       StreamSubscription? temporalSubscription;
       // Emit the executed result of the action to the selected channel.
       temporalSubscription = (result ??
               await _cacheProvider.readCache(
-                  _descriptor._alias, _action.process, cacheStrategy, param))
+                  _descriptor.alias!, _action._process, cacheStrategy, param))
           .timeout(timeout ?? _timeout)
-          .transform<Tuple2<Channel, TResult?>>(
+          .transform<Tuple2<Channel, TResult>>(
               StreamTransformer.fromHandlers(handleData: (data, sink) {
             sink.add(Tuple2(channel$, data));
             _cacheProvider.writeCache(
-                _descriptor._alias, cacheStrategy, data, param);
+                _descriptor.alias!, cacheStrategy, data, param);
           }, handleError: (error, stackTrace, sink) {
             final transformedResult = _action.transform(error);
             if (transformedResult != null) {
@@ -219,6 +224,7 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
         }
       }, onError: (error, stackTrace) {
         _addError(error, stackTrace);
+        end?.call(done);
       }, onDone: () {
         end?.call(done);
         temporalSubscription?.cancel();
@@ -232,4 +238,8 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
   /// If no channel is specified, the default channel is selected.
   Channel _getChannel([Channel Function(TAction)? channel]) =>
       channel?.call(_action) ?? _action.defaultChannel;
+}
+
+extension _ActionExtension<TParam, TResult> on Action<TParam, TResult> {
+  FutureOr<Stream<TResult>> _process(dynamic param) => process(param);
 }
