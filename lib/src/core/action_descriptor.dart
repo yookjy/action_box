@@ -232,7 +232,7 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
 
   /// If no channel is specified, the default channel is selected.
   Channel _getChannel([Channel Function(TAction)? channel]) =>
-      channel?.call(_action) ?? _action.defaultChannel;
+      channel?.call(_action) ?? _action.general;
 }
 
 extension _ActionExtension<TParam, TResult> on Action<TParam, TResult> {

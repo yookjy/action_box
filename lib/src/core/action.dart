@@ -6,7 +6,7 @@ import 'package:action_box/src/utils/disposable.dart';
 import 'package:action_box/src/utils/tuple.dart';
 
 abstract class Action<TParam, TResult> implements Disposable {
-  final Channel defaultChannel = Channel();
+  final Channel general = Channel();
 
   StreamController<Tuple2<Channel, TResult>>? _pipeline;
   StreamController<Tuple2<Channel, TResult>> get pipeline =>

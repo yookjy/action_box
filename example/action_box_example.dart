@@ -52,7 +52,7 @@ void main() async {
   // }).disposedBy(bag);
   //
   actionBox((a) => a.valueConverter.getStringToListValue)
-      .map(channel: (a) => a.ch1 | a.defaultChannel)
+      .map(channel: (a) => a.ch1 | a.general)
       .listen((result) {
     result?.forEach((v) => print(v));
   }, onError: (e) {
