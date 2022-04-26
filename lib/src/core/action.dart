@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:action_box/src/core/action_error.dart';
 import 'package:action_box/src/core/channel.dart';
 import 'package:action_box/src/core/transformed_result.dart';
 import 'package:action_box/src/utils/disposable.dart';
@@ -16,7 +17,7 @@ abstract class Action<TParam, TResult> implements Disposable {
 
   FutureOr<Stream<TResult>> process(TParam param);
 
-  TransformedResult<TResult>? transform(Object error) {
+  TransformedResult<TResult>? transform(ActionError error) {
     return null;
   }
 

@@ -203,7 +203,8 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
             _cacheProvider.writeCache(
                 _descriptor._alias, cacheStrategy, data, param);
           }, handleError: (error, stackTrace, sink) {
-            final transformedResult = _action.transform(error);
+            final actionError = ActionError(error, channel$);
+            final transformedResult = _action.transform(actionError);
             if (transformedResult != null) {
               sink.add(Tuple2(channel$, transformedResult.result));
               return;
