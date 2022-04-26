@@ -11,12 +11,11 @@ import 'package:action_box/src/utils/tuple.dart';
 
 class ActionDescriptor<TAction extends Action<TParam, TResult>, TParam, TResult>
     implements Disposable {
+  final String _alias;
   final TAction Function() _factory;
   late final TAction _action = _factory();
 
-  String? alias;
-
-  ActionDescriptor(this._factory);
+  ActionDescriptor(this._alias, this._factory);
 
   @override
   FutureOr dispose() {
@@ -192,21 +191,17 @@ class _ActionExecutor<TParam, TResult, TAction extends Action<TParam, TResult>>
         throw ArgumentError.notNull('action parameter');
       }
 
-      if (_descriptor.alias?.isEmpty ?? true) {
-        throw Exception('An alias must be set.');
-      }
-
       StreamSubscription? temporalSubscription;
       // Emit the executed result of the action to the selected channel.
       temporalSubscription = (result ??
               await _cacheProvider.readCache(
-                  _descriptor.alias!, _action.process, cacheStrategy, param))
+                  _descriptor._alias, _action.process, cacheStrategy, param))
           .timeout(timeout ?? _timeout)
           .transform<Tuple2<Channel, TResult?>>(
               StreamTransformer.fromHandlers(handleData: (data, sink) {
             sink.add(Tuple2(channel$, data));
             _cacheProvider.writeCache(
-                _descriptor.alias!, cacheStrategy, data, param);
+                _descriptor._alias, cacheStrategy, data, param);
           }, handleError: (error, stackTrace, sink) {
             final transformedResult = _action.transform(error);
             if (transformedResult != null) {

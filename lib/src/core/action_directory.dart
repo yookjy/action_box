@@ -9,7 +9,7 @@ abstract class ActionDirectory implements Disposable {
   late Map<String, ActionDescriptor> _actionDescriptors;
   late Map<String, ActionDirectory> _actionDirectories;
 
-  String? alias;
+  String? _alias;
 
   ActionDirectory() {
     _actionDescriptors = HashMap();
@@ -22,11 +22,11 @@ abstract class ActionDirectory implements Disposable {
     if (permanentKey.isEmpty) {
       throw ArgumentError.value(permanentKey);
     }
-    final directory = _actionDirectories.putIfAbsent(
-        permanentKey, () => factory()) as TActionDirectory;
+    final directory = _actionDirectories.putIfAbsent(permanentKey, factory)
+        as TActionDirectory;
 
-    if (directory.alias?.isEmpty ?? true) {
-      directory.alias = _makePath(permanentKey);
+    if (directory._alias?.isEmpty ?? true) {
+      directory._alias = _makePath(permanentKey);
     }
 
     return directory;
@@ -40,19 +40,17 @@ abstract class ActionDirectory implements Disposable {
       throw ArgumentError.value(permanentKey);
     }
 
-    final descriptor = _actionDescriptors.putIfAbsent(permanentKey,
-            () => ActionDescriptor<TAction, TParam, TResult>(factory))
+    final descriptor = _actionDescriptors.putIfAbsent(
+            permanentKey,
+            () => ActionDescriptor<TAction, TParam, TResult>(
+                _makePath(permanentKey), factory))
         as ActionDescriptor<TAction, TParam, TResult>;
-
-    if (descriptor.alias?.isEmpty ?? true) {
-      descriptor.alias = _makePath(permanentKey);
-    }
 
     return descriptor;
   }
 
   String _makePath(String key) =>
-      (alias?.isEmpty ?? true) ? key : '$alias.$key';
+      (_alias?.isEmpty ?? true) ? key : '$_alias.$key';
 
   @override
   FutureOr dispose() {
